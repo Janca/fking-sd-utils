@@ -92,7 +92,27 @@ Saving 'test, exterior, mountains' to 'D:\test\output\deb4e959cbe791732f1a83e207
 Saving D:\test\training_data\exterior\mountains\120266.png to 'D:\test\output\0ef764e909ad3e63e01a9435b11253f40483cf7f0f336fdea2224dece98365db.png'.
 Saving 'test, exterior, mountains' to 'D:\test\output\0ef764e909ad3e63e01a9435b11253f40483cf7f0f336fdea2224dece98365db.txt'.
 ```
-Sorry for the messy output :sad:
+### Extended Usage
+You can also create text files named `__special.txt` in each directory, or just the root input folder is what I do, to allow you to make quick S/R tags, for example:
+```json
+[
+    {
+        "special_tag":"__black_and_white__",
+        "tags":"black and white, b&w, monochrome",
+        "mode":1
+    }
+]
+```
+
+And any image file or `__prompt.txt` file using `__black_and_white__` will be replaced with `black and white, b&w, monochrome`.
+The modes indicate how it should handle if a parent in the hierarchy has the same special tag.
+```
+    1 - Merge tags with parent
+    2 - Replace with parent
+    3 - Keep current
+```
+
+By default, if `mode` is missing, it will use `merge`.
 
 ---
 ## Final Thoughts
