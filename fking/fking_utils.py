@@ -25,6 +25,9 @@ def read_tags_from_file(path: str) -> list[str]:
     for line in lines:
         tags.extend(line.split(','))
 
+    if len(tags) <= 0:
+        print(f"WARNING: Prompt file at '{path}' is empty.")
+
     return normalize_tags(tags)
 
 
@@ -47,13 +50,14 @@ def normalize_tags(tags: list[str]) -> list[str]:
     return u_tags
 
 
-def write_tags(dst: str, tags: list[str], special_tags: dict[str, tuple[SpecialTagMergeMode, list[str]]] = {}):
+def write_tags(
+        dst: str,
+        tags: list[str],
+        special_tags: dict[str, tuple[SpecialTagMergeMode, list[str]]] = {}
+):
     with open(dst, 'w+') as f:
         t_tags = find_and_replace_special_tags(tags, special_tags)
-
         line = ", ".join(t_tags)
-        line = line.replace('_', ' ')
-
         # print(f"Saving '{line}' to '{dst}'.")
 
         f.write(line)

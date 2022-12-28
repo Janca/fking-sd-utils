@@ -10,6 +10,7 @@ parser.add_argument("-i", "--input", type=str)
 parser.add_argument("-o", "--output", type=str, default="output")
 parser.add_argument("--overwrite", default=False, dest="overwrite", action='store_true')
 parser.add_argument("--i-am-sure", default=False, dest="dummy_failsafe", action='store_true')
+parser.add_argument("--preserve-underscores", default=False, dest="preserve_underscores", action='store_true')
 
 args = parser.parse_args()
 
@@ -18,7 +19,7 @@ output_directory = args.output
 
 if args.overwrite and os.path.exists(output_directory):
     if not args.dummy_failsafe:
-        print("You have not disabled to dummy check, dummy. You must include the flag '--i-am-sure' to be able to "
+        print("You have not disabled the dummy check, dummy. You must include the flag '--i-am-sure' to be able to "
               "overwrite the output directory.")
         exit(-1)
 
@@ -26,7 +27,7 @@ if args.overwrite and os.path.exists(output_directory):
 
 start_time_millis = time.time() * 1000.0
 
-global_concept = create_concept("global", input_directory)
+global_concept = create_concept(args, "global", input_directory)
 
 print("----------------------------------------------\n")
 print("Generating output... please wait...")

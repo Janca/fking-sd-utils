@@ -44,14 +44,19 @@ class Concept:
     :type parent: Concept|None
     """
 
-    def __init__(self, name: str, working_directory: str, parent=None) -> None:
+    def __init__(self, args, name: str, working_directory: str, parent=None) -> None:
+        self.args = args
         self.name = name
         self.parent = parent
         self.working_directory = working_directory
 
         tags_file_path = os.path.join(working_directory, "__prompt.txt")
         self.concept_tags = read_tags_from_file(tags_file_path)
-        self.concept_tags = [t if t != '__folder__' else self.name for t in self.concept_tags]
+        self.concept_tags = [
+            t if t != '__folder__' else self.name
+            if args.preserve_underscores else self.name.replace('_', ' ')
+            for t in self.concept_tags
+        ]
 
         special_tags_file_path = os.path.join(working_directory, "__special.txt")
         self.special_tags = read_special_tags_from_file(special_tags_file_path)
@@ -114,15 +119,15 @@ class Concept:
         return images_saved
 
 
-def create_concept(name: str, directory_path, parent_concept=None) -> Concept:
-    concept = Concept(name, directory_path, parent_concept)
+def create_concept(args, name: str, directory_path, parent_concept=None) -> Concept:
+    concept = Concept(args, name, directory_path, parent_concept)
 
     files = os.listdir(directory_path)
     for filename in files:
         file = os.path.join(directory_path, filename)
 
         if os.path.isdir(file):
-            child = create_concept(filename, file, concept)
+            child = create_concept(args, filename, file, concept)
             concept.add_child(child)
 
         if os.path.isfile(file):
@@ -140,5 +145,6 @@ def create_concept(name: str, directory_path, parent_concept=None) -> Concept:
                 concept_img = ConceptImage(concept, file, img_tags)
                 concept.add_image(concept_img)
 
-    print(f"Created concept: {concept.canonical_name}; concept images: {len(concept.images)}")
+    print(f"Concept: {concept.canonical_name}")
+    print(f"    Images: {len(concept.images)}")
     return concept
