@@ -26,7 +26,7 @@ def read_tags_from_file(path: str) -> list[str]:
         tags.extend(line.split(','))
 
     if len(tags) <= 0:
-        print(f"WARNING: Prompt file at '{path}' is empty.")
+        print(f"\nWARNING: Prompt file at '{path}' is empty.\n")
 
     return normalize_tags(tags)
 
