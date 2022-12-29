@@ -18,7 +18,7 @@ class ConceptImage:
         parent: Concept = self.concept
         while parent is not None:
             p_tags = parent.concept_tags[:]
-            # p_tags.reverse()
+            p_tags.reverse()
 
             c_tags.extend(p_tags)
             parent = parent.parent
