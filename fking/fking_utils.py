@@ -54,14 +54,17 @@ def write_tags(
         dst: str,
         tags: list[str],
         special_tags: dict[str, tuple[SpecialTagMergeMode, list[str]]] = {}
-):
+) -> str:
     with open(dst, 'w+') as f:
         t_tags = find_and_replace_special_tags(tags, special_tags)
         line = ", ".join(t_tags)
+
         # print(f"Saving '{line}' to '{dst}'.")
 
         f.write(line)
         f.close()
+
+        return line
 
 
 def read_special_tags_from_file(path: str) -> dict[str, tuple[SpecialTagMergeMode, list[str]]]:
@@ -118,7 +121,7 @@ def find_and_replace_special_tags(
         special_tags: dict[str, tuple[SpecialTagMergeMode, list[str]]]
 ) -> list[str]:
     if len(special_tags) <= 0:
-        return tags
+        return normalize_tags(tags)
 
     replaced_tags = []
     for t in tags:
@@ -128,3 +131,16 @@ def find_and_replace_special_tags(
             replaced_tags.append(t)
 
     return normalize_tags(replaced_tags)
+
+
+def fix_prompt_text_files(target: str):
+    for root, dirs, files in os.walk(target):
+        for child_dir in dirs:
+            child_dir_path = os.path.join(root, child_dir)
+            fix_prompt_text_files(child_dir_path)
+
+        for file in files:
+            if not file.startswith("__special") and file.endswith(".txt"):
+                tag_file_path = os.path.join(root, file)
+                tags = read_tags_from_file(tag_file_path)
+                write_tags(tag_file_path, tags)

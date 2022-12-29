@@ -163,7 +163,14 @@ def print_concept_info(concept: Concept, recursive: bool = True, indent: int = 0
     indent_str = " │ " * indent
 
     if len(concept.raw_tags) > 0:
-        print(f"{indent_str} ├─tags: {textwrap.fill(', '.join(concept.raw_tags))}")
+        idx = 0
+        tags_wrap = textwrap.wrap(", ".join(concept.raw_tags))
+        for i in tags_wrap:
+            if idx == 0:
+                print(f"{indent_str} ├─tags: {i}")
+            else:
+                print(f"{indent_str} │       {i}")
+            idx += 1
     else:
         print(f"{indent_str} ├─tags: N/A")
 
