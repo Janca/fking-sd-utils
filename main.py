@@ -3,7 +3,7 @@ import os
 import shutil
 import time
 
-from fking.fking_captions import create_concept
+from fking.fking_captions import create_concept, print_concept_info
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--input", type=str)
@@ -23,15 +23,34 @@ if args.overwrite and os.path.exists(output_directory):
               "overwrite the output directory.")
         exit(-1)
 
-    shutil.rmtree(output_directory)
+    else:
+        print()
+        sanity_check = input(f"Output directory exists; are you sure you want to overwrite?"
+                             f"\n  '{output_directory}' [y/N] ")
+
+        if sanity_check and sanity_check.lower() == "y":
+            print()
+            print("Sanity check succeeded!")
+
+            print(f"Deleting output directory '{output_directory}', please wait...")
+            shutil.rmtree(output_directory)
+            pass
+
+        else:
+            print()
+            print("Skipped generation. Nothing was changed.")
+            exit()
+
+print()
+print("Generating output... please wait...")
+print()
 
 start_time_millis = time.time() * 1000.0
-
 global_concept = create_concept(args, "global", input_directory)
 
-print("----------------------------------------------\n")
-print("Generating output... please wait...")
-images = global_concept.build(output_directory)
+print_concept_info(global_concept)
 
+images = global_concept.build(output_directory)
 end_time_millis = time.time() * 1000.0
+
 print(f"Complete. Generated {images} captioned images in {(end_time_millis - start_time_millis):0.2f} millis.")

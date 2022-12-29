@@ -1,5 +1,6 @@
 import os
 import shutil
+import textwrap
 
 from fking.fking_utils import merge_special_tags, read_special_tags_from_file, read_tags_from_file, sha256_file_hash, \
     write_tags
@@ -51,12 +52,19 @@ class Concept:
         self.working_directory = working_directory
 
         tags_file_path = os.path.join(working_directory, "__prompt.txt")
-        self.concept_tags = read_tags_from_file(tags_file_path)
+
+        self.raw_tags = read_tags_from_file(tags_file_path)
+        self.concept_tags = self.raw_tags[:]
+
         self.concept_tags = [
             t if t != '__folder__' else self.name
             if args.preserve_underscores else self.name.replace('_', ' ')
             for t in self.concept_tags
         ]
+
+        for t in self.concept_tags:
+            if t.startswith("__") and not t.endswith("__"):
+                print(f"\nWARNING: You have an incomplete special tag '{t}' in prompt file '{tags_file_path}'.\n")
 
         special_tags_file_path = os.path.join(working_directory, "__special.txt")
         self.special_tags = read_special_tags_from_file(special_tags_file_path)
@@ -136,7 +144,7 @@ def create_concept(args, name: str, directory_path, parent_concept=None) -> Conc
             if extension in [".png", ".jpg", ".jpeg"]:
                 matching_text_filename = filename.replace(extension, ".txt")
                 text_file_path = os.path.join(
-                        directory_path, matching_text_filename)
+                    directory_path, matching_text_filename)
 
                 img_tags = []
                 if os.path.exists(text_file_path):
@@ -145,6 +153,26 @@ def create_concept(args, name: str, directory_path, parent_concept=None) -> Conc
                 concept_img = ConceptImage(concept, file, img_tags)
                 concept.add_image(concept_img)
 
-    print(f"Concept: {concept.canonical_name}")
-    print(f"    Images: {len(concept.images)}")
     return concept
+
+
+def print_concept_info(concept: Concept, recursive: bool = True, indent: int = 0):
+    concept_str = " │ " * (max(0, indent - 1)) + " ├─"
+    print(f"{concept_str}{concept.canonical_name}")
+
+    indent_str = " │ " * indent
+
+    if len(concept.raw_tags) > 0:
+        print(f"{indent_str} ├─tags: {textwrap.fill(', '.join(concept.raw_tags))}")
+    else:
+        print(f"{indent_str} ├─tags: N/A")
+
+    print(f"{indent_str} ├─images: {len(concept.images)}")
+
+    if recursive:
+        if len(concept.children) > 0:
+            indent_str += " │ "
+
+        print(indent_str)
+        for child in concept.children:
+            print_concept_info(child, recursive, indent + 1)
