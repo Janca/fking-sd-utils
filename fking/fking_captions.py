@@ -88,13 +88,13 @@ class Concept:
     def add_image(self, image: ConceptImage):
         self.images.append(image)
 
-    def build(self, dst: str) -> int:
+    def flatten(self, dst: str) -> int:
         os.makedirs(dst, exist_ok=True)
 
         images_saved = 0
 
         for child in self.children:
-            images_saved += child.build(dst)
+            images_saved += child.flatten(dst)
 
         special_tags = self.special_tags
 

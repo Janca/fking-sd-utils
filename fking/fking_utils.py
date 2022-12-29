@@ -144,3 +144,37 @@ def fix_prompt_text_files(target: str):
                 tag_file_path = os.path.join(root, file)
                 tags = read_tags_from_file(tag_file_path)
                 write_tags(tag_file_path, tags)
+
+
+def generate_tag_list(src: str) -> list[str]:
+    unique_tags = []
+
+    for filename in os.listdir(src):
+        if filename.endswith(".txt"):
+            file_path = os.path.join(src, filename)
+            tags = read_tags_from_file(file_path)
+            unique_tags.extend(tags)
+
+    return normalize_tags(unique_tags)
+
+
+def generate_prompt_list(src: str) -> list[str]:
+    unique_prompts = []
+
+    for filename in os.listdir(src):
+        if filename.endswith(".txt"):
+            file_path = os.path.join(src, filename)
+
+            tags = read_tags_from_file(file_path)
+            prompt = ", ".join(tags).strip()
+
+            if prompt not in unique_prompts:
+                unique_prompts.append(prompt)
+
+    return unique_prompts
+
+
+def prompt_warning(warning: str) -> bool:
+    print()
+    sanity_check = input(f"{warning} [y/N] ")
+    return sanity_check and sanity_check.lower() == "y"
