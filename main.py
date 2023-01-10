@@ -1,10 +1,11 @@
 import argparse
 import os
 import shutil
+import sys
 import time
 
 from fking.fking_captions import create_concept, print_concept_info
-from fking.fking_utils import fix_prompt_text_files, prompt_warning, write_tags, generate_prompt_list
+from fking.fking_utils import fix_prompt_text_files, generate_prompt_list, prompt_warning, write_tags
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--no-ui", default=True, dest="use_ui", action='store_false')
@@ -21,7 +22,7 @@ if args.use_ui:
     import fking.captioner.fking_captioner
 
     fking.captioner.fking_captioner.show_ui()
-    exit()
+    sys.exit()
 
 input_directory = args.input
 output_directory = args.output

@@ -1,4 +1,5 @@
 import os
+import sys
 import tkinter as tk
 from functools import cmp_to_key
 from tkinter import filedialog, messagebox, ttk
@@ -11,7 +12,15 @@ from fking.fking_captions import Concept, ConceptImage, create_concept
 from fking.fking_utils import is_image, normalize_tags, write_tags
 
 root = tk.Tk()
-root.iconbitmap("icon.ico")
+
+ico_img = "icon.ico"
+if not hasattr(sys, "frozen"):
+    ico_img = os.path.join(os.path.dirname(__file__), ico_img)
+else:
+    ico_img = os.path.join(sys.prefix, ico_img)
+
+root.iconbitmap(ico_img)
+
 root.resizable(False, False)
 root.option_add('*tearOff', False)
 
@@ -297,7 +306,7 @@ def on_paste_button(event=None):
 
 def on_request_exit(event=None):
     if messagebox.askyesno(title="Confirm Exit", message="Are you sure you want to exit?"):
-        exit()
+        root.destroy()
 
 
 def clear_tree():
