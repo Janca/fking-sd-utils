@@ -12,6 +12,9 @@ class SpecialTagMergeMode(Enum):
     KEEP_EXISTING = 3
 
 
+__img_extensions = [".png", ".jpeg", ".jpg"]
+
+
 def read_tags_from_file(path: str) -> list[str]:
     if not os.path.exists(path):
         return []
@@ -178,3 +181,8 @@ def prompt_warning(warning: str) -> bool:
     print()
     sanity_check = input(f"{warning} [y/N] ")
     return sanity_check and sanity_check.lower() == "y"
+
+
+def is_image(filename: str) -> bool:
+    ext = os.path.splitext(filename)[1]
+    return ext in __img_extensions

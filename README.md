@@ -56,7 +56,7 @@ D:\TEST\TRAINING_DATA
 py main.py
 ```
 
-![UI_Example_1](/ui_image_01.png)
+![UI_Example_1](/.github/ui_image_01.png)
 
 **Utility Usage**
 

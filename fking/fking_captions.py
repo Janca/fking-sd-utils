@@ -3,7 +3,7 @@ import shutil
 import textwrap
 
 from fking.fking_utils import merge_special_tags, read_special_tags_from_file, read_tags_from_file, \
-    find_and_replace_special_tags, normalize_tags, sha256_file_hash, write_tags
+    find_and_replace_special_tags, normalize_tags, sha256_file_hash, write_tags, is_image
 
 
 class FkingImage:
@@ -172,7 +172,7 @@ def create_concept(name: str, directory_path, parent_concept=None) -> Concept:
         if os.path.isfile(file):
             extension = os.path.splitext(file)[1]
 
-            if extension in [".png", ".jpg", ".jpeg"]:
+            if is_image(filename):
                 matching_text_filename = filename.replace(extension, ".txt")
                 text_file_path = os.path.join(
                     directory_path, matching_text_filename)
