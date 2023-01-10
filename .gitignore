@@ -93,3 +93,5 @@ fabric.properties
 
 __pycache__
 *.spec
+dist/*
+build/*
