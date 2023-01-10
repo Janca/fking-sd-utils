@@ -2,15 +2,34 @@ import os
 import shutil
 import textwrap
 
-from fking.fking_utils import merge_special_tags, read_special_tags_from_file, read_tags_from_file, sha256_file_hash, \
-    write_tags
+from fking.fking_utils import merge_special_tags, read_special_tags_from_file, read_tags_from_file, \
+    find_and_replace_special_tags, normalize_tags, sha256_file_hash, write_tags
 
 
-class ConceptImage:
-    def __init__(self, concept, path, tags: list[str] = []) -> None:
+class FkingImage:
+    def __init__(self, concept, path: str, tags: list[str]):
         self.concept = concept
         self.path = path
         self.tags = tags
+
+    def get_filename(self, part: 0 | 1 | -1 = -1) -> str:
+        if part == -1:
+            return os.path.basename(self.path)
+        else:
+            return os.path.splitext(os.path.basename(self.path))[part]
+
+    def get_canonical_name(self) -> str:
+        return f"{self.concept.canonical_name}.{self.get_filename()}"
+
+
+class CaptionedImage(FkingImage):
+    def __init__(self, concept, path: str, tags: list[str]):
+        super().__init__(concept, path, tags)
+
+
+class ConceptImage(FkingImage):
+    def __init__(self, concept, path, tags: list[str] = []) -> None:
+        super().__init__(concept, path, tags)
 
     def generate_tags(self):
         c_tags = self.tags[:]
@@ -34,7 +53,7 @@ class ConceptImage:
 
     def build(self) -> tuple[str, list[str]]:
         tags = self.generate_tags()
-        return self.path, tags
+        return self.path, normalize_tags(tags)
 
 
 class Concept:
@@ -45,8 +64,7 @@ class Concept:
     :type parent: Concept|None
     """
 
-    def __init__(self, args, name: str, working_directory: str, parent=None) -> None:
-        self.args = args
+    def __init__(self, name: str, working_directory: str, parent=None) -> None:
         self.name = name
         self.parent = parent
         self.working_directory = working_directory
@@ -57,10 +75,11 @@ class Concept:
         self.concept_tags = self.raw_tags[:]
 
         self.concept_tags = [
-            t if t != '__folder__' else self.name
-            if args.preserve_underscores else self.name.replace('_', ' ')
-            for t in self.concept_tags
+            t if '__folder__' not in t else t.replace('__folder__', self.name.replace('_', ' '))
+            for t in self.raw_tags
         ]
+
+        print(f"CONCEPT TAGS FOR {name}; {(','.join(self.concept_tags))}")
 
         for t in self.concept_tags:
             if t.startswith("__") and not t.endswith("__"):
@@ -88,54 +107,68 @@ class Concept:
     def add_image(self, image: ConceptImage):
         self.images.append(image)
 
-    def flatten(self, dst: str) -> int:
-        os.makedirs(dst, exist_ok=True)
-
-        images_saved = 0
+    def flatten(self) -> list[CaptionedImage]:
+        captioned_images = []
 
         for child in self.children:
-            images_saved += child.flatten(dst)
+            captioned_images.extend(child.flatten())
 
         special_tags = self.special_tags
 
         for img in self.images:
             path, tags = img.build()
+            tags = find_and_replace_special_tags(tags, special_tags)
 
-            extension = os.path.splitext(path)[1]
-            file_hash = sha256_file_hash(path)
+            captioned_img = CaptionedImage(self, path, tags)
+            captioned_images.append(captioned_img)
 
-            filename = file_hash + extension
-            file_dst = os.path.join(dst, filename)
+        return captioned_images
 
-            tags_filename = f"{file_hash}.txt"
-            tags_dst_path = os.path.join(dst, tags_filename)
+    def write(self, dst: str) -> list[CaptionedImage]:
+        images = self.flatten()
+        output: list[CaptionedImage] = []
 
-            if os.path.exists(file_dst):
-                if os.path.exists(tags_dst_path):
-                    existing_tags = read_tags_from_file(tags_dst_path)
-                    write_tags(tags_dst_path, tags + existing_tags, special_tags)
-                else:
-                    write_tags(tags_dst_path, tags, special_tags)
+        os.makedirs(dst, exist_ok=True)
 
+        for img in images:
+            img_path = img.path
+
+            img_hash = sha256_file_hash(img_path)
+            img_extension = os.path.splitext(img_path)[1]
+
+            img_dst_file_path = f"{img_hash}{img_extension}"
+            img_dst_file_path = os.path.join(dst, img_dst_file_path)
+
+            img_tags_txt_file_path = f"{img_hash}.txt"
+            img_tags_txt_file_path = os.path.join(dst, img_tags_txt_file_path)
+
+            if not os.path.exists(img_dst_file_path):
+                shutil.copyfile(img_path, img_dst_file_path)
+
+            out_tags = img.tags[:]
+            if not os.path.exists(img_tags_txt_file_path):
+                write_tags(img_tags_txt_file_path, out_tags)
             else:
-                # print(f"Saving {img.path} to '{file_dst}'.")
-                shutil.copyfile(img.path, file_dst)
-                write_tags(tags_dst_path, tags, special_tags)
+                existing_tags = read_tags_from_file(img_tags_txt_file_path)
+                out_tags.extend(existing_tags)
 
-                images_saved += 1
+                write_tags(img_tags_txt_file_path, out_tags)
 
-        return images_saved
+            out = CaptionedImage(self, img_dst_file_path, out_tags)
+            output.append(out)
+
+        return output
 
 
-def create_concept(args, name: str, directory_path, parent_concept=None) -> Concept:
-    concept = Concept(args, name, directory_path, parent_concept)
+def create_concept(name: str, directory_path, parent_concept=None) -> Concept:
+    concept = Concept(name, directory_path, parent_concept)
 
     files = os.listdir(directory_path)
     for filename in files:
         file = os.path.join(directory_path, filename)
 
         if os.path.isdir(file):
-            child = create_concept(args, filename, file, concept)
+            child = create_concept(filename, file, concept)
             concept.add_child(child)
 
         if os.path.isfile(file):

@@ -1,16 +1,21 @@
 # fking-sd-utils
+
 **A fking StableDiffusion utility library**
 
 A small collection of utilities to help your StableDiffusion/Dreambooth experience.
-This library is currently focused on assisting with captioning concept images for training in TIs, Hypernetworks or Dreambooth.
+This library is currently focused on assisting with captioning concept images for training in TIs, Hypernetworks or
+Dreambooth.
 
 ## Usage
-The captioning util is a hierarchical based captioner, it will apply the tags of the parent directories to each of its subdirectories and images.
-Each directory can contain a text file named `__prompt.txt`, all text in this file will be prepended to all child images, and subdirectories and their images.
+
+The captioning util is a hierarchical based captioner, it will apply the tags of the parent directories to each of its
+subdirectories and images.
+Each directory can contain a text file named `__prompt.txt`, all text in this file will be prepended to all child
+images, and subdirectories and their images.
 Using `__folder__` in the `__prompt.txt` file will automatically use the parent directory's name.
 
-
 **Example File Tree**
+
 ```commandline
 D:\TEST\TRAINING_DATA
 │   __prompt.txt
@@ -47,11 +52,13 @@ D:\TEST\TRAINING_DATA
 ```
 
 **Utility Usage**
+
 ```commandline
 py main.py -i "input_directory" -o "output_directory"
 ```
 
 **Example output from the above file structure**
+
 ```commandline
 Saving D:\test\training_data\exterior\cityscape\120228.png to 'D:\test\output\9baafde2e93eecf8835d52b8555d0fb27fccc17f1af9e5f8086fd581312775bf.png'.
 Saving 'test, exterior, cityscape' to 'D:\test\output\9baafde2e93eecf8835d52b8555d0fb27fccc17f1af9e5f8086fd581312775bf.txt'.
@@ -92,8 +99,12 @@ Saving 'test, exterior, mountains' to 'D:\test\output\deb4e959cbe791732f1a83e207
 Saving D:\test\training_data\exterior\mountains\120266.png to 'D:\test\output\0ef764e909ad3e63e01a9435b11253f40483cf7f0f336fdea2224dece98365db.png'.
 Saving 'test, exterior, mountains' to 'D:\test\output\0ef764e909ad3e63e01a9435b11253f40483cf7f0f336fdea2224dece98365db.txt'.
 ```
+
 ### Extended Usage
-You can also create text files named `__special.txt` in each directory, or just the root input folder is what I do, to allow you to make quick S/R tags, for example:
+
+You can also create text files named `__special.txt` in each directory, or just the root input folder is what I do, to
+allow you to make quick S/R tags, for example:
+
 ```json
 [
     {
@@ -104,8 +115,10 @@ You can also create text files named `__special.txt` in each directory, or just 
 ]
 ```
 
-And any image file or `__prompt.txt` file using `__black_and_white__` will be replaced with `black and white, b&w, monochrome`.
+And any image file or `__prompt.txt` file using `__black_and_white__` will be replaced
+with `black and white, b&w, monochrome`.
 The modes indicate how it should handle if a parent in the hierarchy has the same special tag.
+
 ```
     1 - Merge tags with parent
     2 - Replace with parent
@@ -115,6 +128,9 @@ The modes indicate how it should handle if a parent in the hierarchy has the sam
 By default, if `mode` is missing, it will use `merge`.
 
 ---
+
 ## Final Thoughts
-Don't expect things not to be broken, Python isn't my strongest language, and I am not concerned with breaking changes, I will be pushing whatever to this repo.
+
+Don't expect things not to be broken, Python isn't my strongest language, and I am not concerned with breaking changes,
+I will be pushing whatever to this repo.
 Feel free to make any pull requests you'd like. It would be nice to have some collaboration.

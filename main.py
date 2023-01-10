@@ -4,7 +4,7 @@ import shutil
 import time
 
 from fking.fking_captions import create_concept, print_concept_info
-from fking.fking_utils import fix_prompt_text_files, prompt_warning, generate_tag_list, write_tags, generate_prompt_list
+from fking.fking_utils import fix_prompt_text_files, prompt_warning, write_tags, generate_prompt_list
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--input", type=str)
@@ -55,13 +55,13 @@ print("Generating output... please wait...")
 print()
 
 start_time_millis = time.time() * 1000.0
-global_concept = create_concept(args, "global", input_directory)
+global_concept = create_concept("global", input_directory)
 
 if args.tree:
     print_concept_info(global_concept)
 
 if output_directory is not None:
-    images = global_concept.flatten(merge_directory)
+    global_concept.write(merge_directory)
 
     unique_prompts = generate_prompt_list(merge_directory)
     unique_prompts_file_path = os.path.join(output_directory, "unique_prompt.txt")
@@ -73,6 +73,7 @@ if output_directory is not None:
     unique_tags_file_path = os.path.join(output_directory, "unique_tags.txt")
     write_tags(unique_tags_file_path, unique_tags)
 
-end_time_millis = time.time() * 1000.0
+    end_time_millis = time.time() * 1000.0
 
-print(f"Complete. Generated {images} captioned images in {(end_time_millis - start_time_millis):0.2f} millis.")
+print("Done.")
+print()
