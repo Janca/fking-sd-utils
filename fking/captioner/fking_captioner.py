@@ -5,7 +5,8 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageTk
 
-from fking.captioner.fk_captioning_utils import flatten_dataset, get_concept_tags, get_image_tags, load_image
+from fking.captioner.fk_captioning_utils import create_image_grid, flatten_dataset, get_concept_tags, get_image_tags, \
+    load_image
 from fking.fking_captions import Concept, ConceptImage, create_concept
 from fking.fking_utils import is_image, normalize_tags, write_tags
 
@@ -26,8 +27,10 @@ current_dataset_tags: dict[str, list[str]] = {}
 
 last_modified_tags: list[str] = []
 
-active_img: None | ImageTk.PhotoImage = None
+transparent_img = ImageTk.PhotoImage(Image.new("RGBA", (512, 512), (0, 0, 0, 0)))
+active_img: None | ImageTk.PhotoImage = transparent_img
 
+max_load_concept_images = 81  # sqrt 9, so 9x9 image grid
 active_concept_image: ConceptImage | None = None
 
 active_parent_tags: list[str] = []
@@ -45,6 +48,10 @@ def set_active_image(canonical_img: str):
         return
 
     active_concept_image = concept_images[canonical_img]
+    image_concept = active_concept_image.concept
+    concept_raw_tags = image_concept.raw_tags
+
+    print(f"Selected raw tags: {concept_raw_tags}")
 
     active_img_tags, active_parent_tags = get_image_tags(canonical_img, concepts, concept_images, current_dataset_tags)
     set_tags_text(active_img_tags, active_parent_tags)
@@ -58,9 +65,44 @@ def set_active_image(canonical_img: str):
 
 
 def set_active_concept(canonical_concept: str):
-    global active_img_tags, active_parent_tags
+    global active_img_tags, active_parent_tags, active_img, active_concept_image
+
+    label_image_preview['image'] = transparent_img
+
+    active_img_tags = None
+    active_concept_image = None
 
     target_concept = concepts[canonical_concept]
+
+    total = 0
+    selected_concept_images = []
+
+    try:
+        for key in concepts:
+            if key == canonical_concept or key.startswith(canonical_concept):
+                c = concepts[key]
+                for ci in c.images:
+                    ciid = ci.get_canonical_name()
+                    ci_img = load_image(ciid, image_cache, concept_images)
+                    selected_concept_images.append(ci_img)
+                    total += 1
+
+                    if total >= max_load_concept_images:
+                        raise StopIteration  # really python, no labeled loops?
+
+    except StopIteration:
+        # NOP
+        pass
+
+    sel_ci_length = len(selected_concept_images)
+    if sel_ci_length > 0:
+        max_image_selection = min(sel_ci_length, max_load_concept_images)
+        concept_grid = create_image_grid(selected_concept_images[:max_image_selection])
+        concept_grid = ImageTk.PhotoImage(concept_grid)
+
+        active_img = concept_grid
+        label_image_preview["image"] = active_img
+
     active_img_tags, active_parent_tags = get_concept_tags(canonical_concept, concepts, current_dataset_tags)
 
     set_tags_text(active_img_tags, active_parent_tags)
@@ -111,6 +153,10 @@ def on_menu_item_save(event=None):
                                "Saving will write changes to your dataset, are you sure you want to continue?"):
         return
 
+    tree_sel = treeview_concept.selection()
+    if tree_sel is not None and len(tree_sel) > 0:
+        tree_sel = tree_sel[0]
+
     touched = 0
     for modified in current_dataset_tags:
         if modified in concept_images:
@@ -127,7 +173,19 @@ def on_menu_item_save(event=None):
 
         elif modified in concepts:
             concept = concepts[modified]
+            c_name = concept.name.replace("_", " ")
+
             m_tags = current_dataset_tags[modified]
+            r_tags = concept.raw_tags
+
+            if "__folder__" in r_tags:
+                for mt_idx in range(len(m_tags)):
+                    mt = m_tags[mt_idx]
+                    if mt == c_name:
+                        print("Replacing concept name with raw __folder__ tag")
+                        m_tags[mt_idx] = "__folder__"
+                        break
+
             if len(m_tags) > 0:
                 touched += 1
                 w_dir = concept.working_directory
@@ -139,10 +197,8 @@ def on_menu_item_save(event=None):
     else:
         messagebox.showinfo("Save Complete", f"Modified {touched} file(s). Reloading changes from disk.")
 
-        active_iid = active_concept_image.get_canonical_name()
-
+        active_iid = active_concept_image.get_canonical_name() if active_concept_image else tree_sel
         load_concept_tree(working_directory)
-
         open_tree_item(active_iid)
 
 
@@ -442,9 +498,10 @@ root.grid_columnconfigure(0, minsize=256)
 root.grid_columnconfigure(1, minsize=512 - 124, weight=1)
 root.grid_columnconfigure(2, minsize=124)
 
-label_image_preview = ttk.Label()
+label_image_preview = ttk.Label(padding=(0, 0))
+label_image_preview["image"] = transparent_img
 label_image_preview.grid(row=0, column=1, columnspan=2, padx=(padding_half_size, padding_size),
-                         pady=(padding_size, padding_half_size))
+                         pady=(padding_size, padding_half_size), sticky="news")
 
 parent_tags_field = tk.Text(height=1, wrap=tk.WORD)
 parent_tags_field.config(state=tk.DISABLED)

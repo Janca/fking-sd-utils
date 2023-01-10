@@ -37,7 +37,7 @@ def load_image(
     return image
 
 
-def create_image_grid(images: list[Image]):
+def create_image_grid(images: list[Image], target_size: int = 512):
     rows = math.sqrt(len(images))
     rows = round(rows)
 
@@ -49,7 +49,26 @@ def create_image_grid(images: list[Image]):
     for i, img in enumerate(images):
         grid.paste(img, box=(i % cols * w, i // cols * h))
 
-    return grid
+    w, h = grid.size
+    ratio = float(h) / float(w)
+
+    if w > h:
+        w = target_size
+        h = int(target_size * ratio)
+    elif w < h:
+        h = target_size
+        w = int(target_size * ratio)
+    else:
+        w = h = target_size
+
+    if w != 512 or h != 512:
+        max_size = max(grid.size)
+        black_bg = Image.new("RGB", size=(max_size, max_size), color='black')
+        black_bg.paste(grid)
+
+        return black_bg.resize((target_size, target_size))
+
+    return grid.resize((w, h))
 
 
 def flatten_dataset(
