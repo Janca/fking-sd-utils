@@ -79,8 +79,6 @@ class Concept:
             for t in self.raw_tags
         ]
 
-        print(f"CONCEPT TAGS FOR {name}; {(','.join(self.concept_tags))}")
-
         for t in self.concept_tags:
             if t.startswith("__") and not t.endswith("__"):
                 print(f"\nWARNING: You have an incomplete special tag '{t}' in prompt file '{tags_file_path}'.\n")

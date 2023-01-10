@@ -1,14 +1,15 @@
-import os.path
-import os.path
+import os
+import shutil
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import messagebox
 from tkinter import ttk
 
 from PIL import Image, ImageTk
 
 from fking.captioner.fk_captioning_utils import load_image
 from fking.fking_captions import Concept, ConceptImage, create_concept
-from fking.fking_utils import normalize_tags
+from fking.fking_utils import normalize_tags, write_tags
 
 root = tk.Tk()
 root.option_add('*tearOff', False)
@@ -28,16 +29,18 @@ last_modified_tags: list[str] = []
 active_img: None | ImageTk.PhotoImage = None
 
 active_concept_image: ConceptImage | None = None
+
+active_parent_tags: list[str] = []
 active_img_tags: list[str] = []
 
 
 def set_active_image(canonical_img: str):
-    global active_img, active_img_tags, active_concept_image
+    global active_img, active_img_tags, active_concept_image, active_parent_tags
 
     active_concept_image = concept_images[canonical_img]
 
-    active_img_tags, parent_img_tags = get_image_tags(canonical_img)
-    set_tags_text(active_img_tags, parent_img_tags)
+    active_img_tags, active_parent_tags = get_image_tags(canonical_img)
+    set_tags_text(active_img_tags, active_parent_tags)
 
     image = load_image(canonical_img, image_cache, concept_images)
     img_tk = ImageTk.PhotoImage(image)
@@ -48,14 +51,12 @@ def set_active_image(canonical_img: str):
 
 
 def set_active_concept(canonical_concept: str):
+    global active_img_tags, active_parent_tags
+
     target_concept = concepts[canonical_concept]
+    active_img_tags, active_parent_tags = get_concept_tags(canonical_concept)
 
-    target_concept_tags, parent_concept_tags = get_concept_tags(canonical_concept)
-
-    set_tags_text(target_concept_tags, parent_concept_tags)
-
-    print(f"Parent tags: {', '.join(parent_concept_tags)}")
-
+    set_tags_text(active_img_tags, active_parent_tags)
     path = os.path.relpath(target_concept.working_directory, working_directory)
     if path == ".":
         set_title()
@@ -63,7 +64,7 @@ def set_active_concept(canonical_concept: str):
         set_title(f"'{path}'")
 
 
-def get_image_tags(canonical_img: str) -> (list[str], list[str]):
+def get_image_tags(canonical_img: str) -> tuple[list[str], list[str]]:
     c_img = concept_images[canonical_img]
     img_concept: Concept = c_img.concept
 
@@ -74,7 +75,7 @@ def get_image_tags(canonical_img: str) -> (list[str], list[str]):
     return normalize_tags(tags), normalize_tags(c_tags)
 
 
-def get_concept_tags(canonical_concept: str) -> (list[str], list[str]):
+def get_concept_tags(canonical_concept: str) -> tuple[list[str], list[str]]:
     target_concept = concepts[canonical_concept]
 
     parent_tags: (list[str], list[str]) = get_concept_tags(
@@ -108,7 +109,73 @@ def on_menu_item_open(event=None):
 
 
 def on_menu_item_flatten():
-    pass
+    dst_directory = filedialog.askdirectory()
+    if dst_directory is not None and len(dst_directory) > 0:
+        flatten_dataset(dst_directory)
+
+
+def flatten_dataset(dst: str):
+    unique_prompts: list[str] = []
+    unique_tags: list[str] = []
+
+    dataset_dst = os.path.join(dst, "dataset")
+    if os.path.exists(dataset_dst):
+        confirmation = messagebox.askyesno(title="Confirmation",
+                                           message="Are you sure you want to overwrite this directory?")
+
+        if confirmation:
+            shutil.rmtree(dataset_dst)
+
+    os.makedirs(dataset_dst, exist_ok=True)
+
+    for c_img in concept_images:
+        concept_image = concept_images[c_img]
+
+        tags, c_tags = get_image_tags(c_img)
+        special_tags = concept_image.concept.special_tags
+        tags = normalize_tags(c_tags + tags)
+
+        filename = concept_image.get_filename(0)
+        extension = concept_image.get_filename(1)
+
+        img_path = concept_image.path
+        tags_file_path = os.path.join(dataset_dst, f"{filename}.txt")
+
+        shutil.copyfile(img_path, os.path.join(dataset_dst, f"{filename}{extension}"))
+        str_tags, tags = write_tags(tags_file_path, tags, special_tags)
+
+        if str_tags not in unique_prompts:
+            unique_prompts.append(str_tags)
+
+        for t in tags:
+            if t not in unique_tags:
+                unique_tags.append(t)
+
+    unique_prompts_path = os.path.join(dst, "unique_concept_prompts.txt")
+    with open(unique_prompts_path, "w+") as f:
+        for str_tags in normalize_tags(unique_prompts):
+            f.write(f"{str_tags}\r\n")
+        f.close()
+
+    unique_tags_path = os.path.join(dst, "unique_concept_tags.txt")
+    write_tags(unique_tags_path, unique_tags)
+
+
+def get_canonical_index(canonical_str, search: dict) -> int:
+    keys = search.keys()
+    index = -1
+
+    for k in keys:
+        index = index + 1
+        if k == canonical_str:
+            return index
+
+    return index
+
+
+def get_canonical_from_index(index: int, search: dict) -> str:
+    keys = list(search.keys())
+    return keys[index]
 
 
 def on_tree_view_child_click(event):
@@ -125,34 +192,6 @@ def on_tree_view_child_click(event):
         set_active_concept(tree_sel)
 
 
-def diff_tags(canonical) -> list[str]:
-    global last_modified_tags, modified_tags
-
-    def unique_tags(src: list[str], dst: list[str]) -> list[str]:
-        return [t for t in src if t not in dst]
-
-    def text_tags():
-        tt = text_image_tags_field.get(1.0, tk.END)
-        return normalize_tags([t for t in tt.split(",")])
-
-    text_tags = text_tags()
-
-    if canonical in concept_images:
-        tags = concept_images[canonical].tags
-
-        if len(text_tags) < len(tags):
-            return []
-        else:
-            return unique_tags(text_tags, tags)
-
-    elif canonical in concepts:
-        tags = concepts[canonical].concept_tags
-        return unique_tags(text_tags, tags)
-
-    else:
-        return []
-
-
 def on_save_button(event):
     global last_modified_tags, modified_tags
 
@@ -161,9 +200,10 @@ def on_save_button(event):
         return
 
     tree_sel = tree_selection[0]
-    current_dataset_tags[tree_sel] = tags_from_text_field()
+    tags = tags_from_text_field()
 
-    print(f"Applied: {', '.join(current_dataset_tags[tree_sel])}")
+    current_dataset_tags[tree_sel] = tags
+    last_modified_tags = tags
 
 
 def tags_from_text_field():
@@ -174,10 +214,40 @@ def tags_from_text_field():
 def on_next_button(event):
     on_save_button(event)
 
+    tree_sel = treeview_concept.selection()
+    if len(tree_sel) <= 0:
+        return
+
+    tree_sel = tree_sel[0]
+    can_idx = get_canonical_index(tree_sel, concept_images)
+    next_idx = can_idx + 1
+
+    if next_idx < len(concept_images):
+        next_id = get_canonical_from_index(next_idx, concept_images)
+        if next_id is not None:
+            treeview_concept.selection_clear()
+            treeview_concept.selection_set(next_id)
+            treeview_concept.focus(next_id)
+
+            concept = concept_images[next_id].concept
+
+            while concept is not None:
+                concept_iid = concept.canonical_name
+                treeview_concept.item(concept_iid, open=True)
+                concept = concept.parent
+
+    text_image_tags_field.focus_force()
+
+
+def on_paste_button(event):
+    if last_modified_tags is not None and len(last_modified_tags) > 0:
+        set_tags_text(last_modified_tags, active_parent_tags)
+
 
 def clear_tree():
     concepts.clear()
     concept_images.clear()
+    menu_file.entryconfig("Flatten Dataset", state=tk.DISABLED)
     treeview_concept.delete(*treeview_concept.get_children())
 
 
@@ -203,6 +273,7 @@ def build_tree(concept: Concept):
 
     tree_item = build_child(concept)
     treeview_concept.item(tree_item, open=True)
+    menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
 
 
 def set_tags_text(tags: list[str], parent_tags: list[str] = None):
@@ -275,6 +346,8 @@ button_paste = tk.Button(text="Paste Last")
 button_paste.grid(row=4, column=2, sticky="news", padx=(padding_half_size, padding_half_size),
                   pady=(padding_half_size, 0))
 
+button_paste.bind("<Button-1>", on_paste_button)
+
 button_save = tk.Button(text="Apply")
 button_save.grid(row=5, column=2, sticky="news", padx=(padding_half_size, padding_half_size),
                  pady=0)
@@ -286,6 +359,8 @@ button_next.grid(row=6, column=2, sticky="news", padx=(padding_half_size, paddin
 
 button_next.bind("<Button-1>", on_next_button)
 
-root.pack_slaves()
-root.config(menu=menubar)
-root.mainloop()
+
+def show_ui():
+    root.pack_slaves()
+    root.config(menu=menubar)
+    root.mainloop()

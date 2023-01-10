@@ -7,6 +7,7 @@ from fking.fking_captions import create_concept, print_concept_info
 from fking.fking_utils import fix_prompt_text_files, prompt_warning, write_tags, generate_prompt_list
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--no-ui", default=True, dest="use_ui", action='store_false')
 parser.add_argument("-i", "--input", type=str)
 parser.add_argument("-o", "--output", type=str, default=None)
 parser.add_argument("--overwrite", default=False, dest="overwrite", action='store_true')
@@ -15,6 +16,12 @@ parser.add_argument("--fix-prompts", default=False, dest="fix_prompts", action='
 parser.add_argument("--no-tree", default=True, dest="tree", action="store_false")
 
 args = parser.parse_args()
+
+if args.use_ui:
+    import fking.captioner.fking_captioner
+
+    fking.captioner.fking_captioner.show_ui()
+    exit()
 
 input_directory = args.input
 output_directory = args.output

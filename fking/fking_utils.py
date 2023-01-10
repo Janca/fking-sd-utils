@@ -54,7 +54,7 @@ def write_tags(
         dst: str,
         tags: list[str],
         special_tags: dict[str, tuple[SpecialTagMergeMode, list[str]]] = {}
-) -> str:
+) -> tuple[str, list[str]]:
     with open(dst, 'w+') as f:
         t_tags = find_and_replace_special_tags(tags, special_tags)
         line = ", ".join(t_tags)
@@ -64,7 +64,7 @@ def write_tags(
         f.write(line)
         f.close()
 
-        return line
+        return line, t_tags
 
 
 def read_special_tags_from_file(path: str) -> dict[str, tuple[SpecialTagMergeMode, list[str]]]:
