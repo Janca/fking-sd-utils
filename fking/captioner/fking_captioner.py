@@ -19,6 +19,7 @@ working_concept: Concept | None = None
 
 concepts: dict[str, Concept] = {}
 concept_images: dict[str, ConceptImage] = {}
+sorted_concept_images: dict[str, ConceptImage] = {}
 image_cache: dict[str, Image] = {}
 
 modified_tags: dict[str, list[str]] = {}
@@ -151,17 +152,17 @@ def on_next_button(event):
         return
 
     tree_sel = tree_sel[0]
-    can_idx = get_canonical_index(tree_sel, concept_images)
+    can_idx = get_canonical_index(tree_sel, sorted_concept_images)
     next_idx = can_idx + 1
 
-    if next_idx < len(concept_images):
-        next_id = get_canonical_from_index(next_idx, concept_images)
+    if next_idx < len(sorted_concept_images):
+        next_id = get_canonical_from_index(next_idx, sorted_concept_images)
         if next_id is not None:
             treeview_concept.selection_clear()
             treeview_concept.selection_set(next_id)
             treeview_concept.focus(next_id)
 
-            concept = concept_images[next_id].concept
+            concept = sorted_concept_images[next_id].concept
 
             while concept is not None:
                 concept_iid = concept.canonical_name
@@ -184,7 +185,11 @@ def on_request_exit(event=None):
 def clear_tree():
     concepts.clear()
     concept_images.clear()
+    sorted_concept_images.clear()
+
     menu_file.entryconfig("Flatten Dataset", state=tk.DISABLED)
+    menu_file.entryconfig("Save Dataset", state=tk.DISABLED)
+
     treeview_concept.delete(*treeview_concept.get_children())
 
 
@@ -218,6 +223,14 @@ def build_tree(concept: Concept):
 
         return c.canonical_name, tree_inserts
 
+    def cmp_numeric(x, y):
+        if x == y:
+            return 0
+        elif x < y:
+            return -1
+        else:
+            return 1
+
     # best just to keep this bad boy collapsed
     def compare(a: str, b: str) -> int:
         def is_numeric(x) -> (bool, float):
@@ -225,7 +238,6 @@ def build_tree(concept: Concept):
                 f = float(x)
                 return True, f
             except ValueError:
-                print(f"{x} is not float")
                 return False, None
 
         def filename(x: str, is_img: bool) -> (str, str, str):
@@ -244,7 +256,9 @@ def build_tree(concept: Concept):
         a_is_image = is_image(a)
         b_is_image = is_image(b)
 
-        if a_is_image and not b_is_image:
+        if not a_is_image and b_is_image:
+            return -1
+        elif a_is_image and not b_is_image:
             return 1
         elif b_is_image and not a_is_image:
             return -1
@@ -256,13 +270,23 @@ def build_tree(concept: Concept):
             b_numeric, b_val = is_numeric(b_name)
 
             if a_numeric and b_numeric:
-                print(f"Comparing {a} and {b} numerically")
-                if a_val == b_val:
-                    return compare(a_ext[1:], b_ext[1:])
-                elif a_val < b_val:
+                a_part = a[:a.rindex(a_filename) - 1]
+                b_part = b[:b.rindex(b_filename) - 1]
+
+                if a_part == b_part:
+                    return cmp_numeric(a_val, b_val)
+                elif a_part < b_part:
                     return -1
                 else:
                     return 1
+
+            # if a_numeric and b_numeric:
+            #     if a_val == b_val:
+            #         return compare(a_ext[1:], b_ext[1:])
+            #     elif a_val < b_val:
+            #         return -1
+            #     else:
+            #         return 1
 
             elif a == b:
                 return 0
@@ -279,6 +303,8 @@ def build_tree(concept: Concept):
 
     for a_key in alphabetized_keys:
         parent, position, iid, text = tree_items[a_key]
+        if iid in concept_images:
+            sorted_concept_images[iid] = concept_images[iid]
         treeview_concept.insert(parent, position, iid, text=text)
 
     treeview_concept.item(root_concept, open=True)
