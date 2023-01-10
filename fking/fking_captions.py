@@ -2,13 +2,13 @@ import os
 import shutil
 import textwrap
 
-from fking.fking_utils import merge_special_tags, read_special_tags_from_file, read_tags_from_file, \
-    find_and_replace_special_tags, normalize_tags, sha256_file_hash, write_tags, is_image
+from fking.fking_utils import find_and_replace_special_tags, is_image, merge_special_tags, normalize_tags, \
+    read_special_tags_from_file, read_tags_from_file, sha256_file_hash, write_tags
 
 
 class FkingImage:
     def __init__(self, concept, path: str, tags: list[str]):
-        self.concept = concept
+        self.concept: Concept = concept
         self.path = path
         self.tags = tags
 
@@ -175,7 +175,7 @@ def create_concept(name: str, directory_path, parent_concept=None) -> Concept:
             if is_image(filename):
                 matching_text_filename = filename.replace(extension, ".txt")
                 text_file_path = os.path.join(
-                    directory_path, matching_text_filename)
+                        directory_path, matching_text_filename)
 
                 img_tags = []
                 if os.path.exists(text_file_path):

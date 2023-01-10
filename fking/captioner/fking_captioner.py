@@ -7,7 +7,7 @@ from PIL import Image, ImageTk
 
 from fking.captioner.fk_captioning_utils import flatten_dataset, get_concept_tags, get_image_tags, load_image
 from fking.fking_captions import Concept, ConceptImage, create_concept
-from fking.fking_utils import is_image, normalize_tags
+from fking.fking_utils import is_image, normalize_tags, write_tags
 
 root = tk.Tk()
 root.iconbitmap("icon.ico")
@@ -22,7 +22,6 @@ concept_images: dict[str, ConceptImage] = {}
 sorted_concept_images: dict[str, ConceptImage] = {}
 image_cache: dict[str, Image] = {}
 
-modified_tags: dict[str, list[str]] = {}
 current_dataset_tags: dict[str, list[str]] = {}
 
 last_modified_tags: list[str] = []
@@ -37,6 +36,13 @@ active_img_tags: list[str] = []
 
 def set_active_image(canonical_img: str):
     global active_img, active_img_tags, active_concept_image, active_parent_tags
+
+    if canonical_img is None:
+        del active_img
+        del active_img_tags
+        del active_concept_image
+        del active_parent_tags
+        return
 
     active_concept_image = concept_images[canonical_img]
 
@@ -75,13 +81,23 @@ def set_title(title: str | None = None):
 def on_menu_item_open(event=None):
     global working_concept, working_directory
 
-    working_directory = filedialog.askdirectory()
+    src = filedialog.askdirectory()
+    load_concept_tree(src)
+
+
+def load_concept_tree(src_dir: str) -> Concept:
+    global working_concept, working_directory
+
+    working_directory = src_dir
+
     if working_directory is not None and len(working_directory) > 0:
         working_concept = create_concept("global", working_directory)
         build_tree(working_concept)
     else:
         working_concept = None
         clear_tree()
+
+    return working_concept
 
 
 def on_menu_item_flatten(event=None):
@@ -91,7 +107,43 @@ def on_menu_item_flatten(event=None):
 
 
 def on_menu_item_save(event=None):
-    pass
+    if not messagebox.askyesno("Confirm Save",
+                               "Saving will write changes to your dataset, are you sure you want to continue?"):
+        return
+
+    touched = 0
+    for modified in current_dataset_tags:
+        if modified in concept_images:
+            concept_image = concept_images[modified]
+            parent_concept = concept_image.concept
+            special_tags = parent_concept.special_tags
+
+            m_tags = current_dataset_tags[modified]
+            if len(m_tags) > 0:
+                touched += 1
+                img_dir = parent_concept.working_directory
+                tags_txt_file = os.path.join(img_dir, f"{concept_image.get_filename(0)}.txt")
+                write_tags(tags_txt_file, m_tags, special_tags)
+
+        elif modified in concepts:
+            concept = concepts[modified]
+            m_tags = current_dataset_tags[modified]
+            if len(m_tags) > 0:
+                touched += 1
+                w_dir = concept.working_directory
+                tags_txt_file = os.path.join(w_dir, "__prompt.txt")
+                write_tags(tags_txt_file, m_tags)
+
+    if touched <= 0:
+        messagebox.showinfo("Save Complete", "Contents unchanged, no changes were written to disk.")
+    else:
+        messagebox.showinfo("Save Complete", f"Modified {touched} file(s). Reloading changes from disk.")
+
+        active_iid = active_concept_image.get_canonical_name()
+
+        load_concept_tree(working_directory)
+
+        open_tree_item(active_iid)
 
 
 def get_canonical_index(canonical_str, search: dict) -> int:
@@ -126,7 +178,7 @@ def on_tree_view_child_click(event):
 
 
 def on_save_button(event):
-    global last_modified_tags, modified_tags
+    global last_modified_tags
 
     tree_selection = treeview_concept.selection()
     if len(tree_selection) <= 0:
@@ -153,23 +205,33 @@ def on_next_button(event):
 
     tree_sel = tree_sel[0]
     can_idx = get_canonical_index(tree_sel, sorted_concept_images)
+    if can_idx <= -1:
+        return
+
     next_idx = can_idx + 1
 
     if next_idx < len(sorted_concept_images):
         next_id = get_canonical_from_index(next_idx, sorted_concept_images)
         if next_id is not None:
-            treeview_concept.selection_clear()
-            treeview_concept.selection_set(next_id)
-            treeview_concept.focus(next_id)
-
-            concept = sorted_concept_images[next_id].concept
-
-            while concept is not None:
-                concept_iid = concept.canonical_name
-                treeview_concept.item(concept_iid, open=True)
-                concept = concept.parent
+            open_tree_item(next_id)
 
     text_image_tags_field.focus_force()
+
+
+def open_tree_item(iid: str):
+    treeview_concept.selection_clear()
+    treeview_concept.selection_set(iid)
+    treeview_concept.focus(iid)
+
+    concept = sorted_concept_images[iid].concept
+
+    # event listener is firing this
+    # set_active_image(iid)
+
+    while concept is not None:
+        concept_iid = concept.canonical_name
+        treeview_concept.item(concept_iid, open=True)
+        concept = concept.parent
 
 
 def on_paste_button(event=None):
@@ -185,7 +247,10 @@ def on_request_exit(event=None):
 def clear_tree():
     concepts.clear()
     concept_images.clear()
+    current_dataset_tags.clear()
     sorted_concept_images.clear()
+    image_cache.clear()
+    last_modified_tags.clear()
 
     menu_file.entryconfig("Flatten Dataset", state=tk.DISABLED)
     menu_file.entryconfig("Save Dataset", state=tk.DISABLED)

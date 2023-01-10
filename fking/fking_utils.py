@@ -58,6 +58,7 @@ def write_tags(
         tags: list[str],
         special_tags: dict[str, tuple[SpecialTagMergeMode, list[str]]] = {}
 ) -> tuple[str, list[str]]:
+    dst = os.path.abspath(dst)
     with open(dst, 'w+') as f:
         t_tags = find_and_replace_special_tags(tags, special_tags)
         line = ", ".join(t_tags)
