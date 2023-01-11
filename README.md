@@ -50,6 +50,7 @@ D:\TEST\TRAINING_DATA
 │           120266.png
 │           __prompt.txt
 ```
+
 ## Run with no parameters to enable working through the UI.
 
 ```commandline
@@ -58,7 +59,18 @@ py main.py
 
 ![UI_Example_1](/.github/ui_image_01.png)
 
+**Executable**
+
+You can build your own executable of the UI using pyinstaller, after compilation the executable will be available in the
+dist directory.
+
+```commandline
+pyinstaller fking-captioner.spec
+```
+
 **Utility Usage**
+
+Flatten input dataset into output directory.
 
 ```commandline
 py main.py --no-ui -i "input_directory" -o "output_directory"
@@ -71,11 +83,11 @@ allow you to make quick S/R tags, for example:
 
 ```json
 [
-    {
-        "special_tag":"__black_and_white__",
-        "tags":"black and white, b&w, monochrome",
-        "mode":1
-    }
+  {
+    "special_tag": "__black_and_white__",
+    "tags": "black and white, b&w, monochrome",
+    "mode": 1
+  }
 ]
 ```
 
