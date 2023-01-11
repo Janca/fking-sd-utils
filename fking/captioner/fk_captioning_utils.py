@@ -1,11 +1,10 @@
 import math
 import os
 import shutil
-from tkinter import messagebox
 
 from PIL import Image
 
-from fking.fking_captions import Concept, ConceptImage
+from fking.fking_captions import CaptionedImage, Concept, ConceptImage
 from fking.fking_utils import normalize_tags, write_tags
 
 
@@ -110,6 +109,7 @@ def create_image_grid(images: list[Image], target_size: int = 512):
 
 def flatten_dataset(
         dst: str,
+        dataset_dst: str,
         concepts: dict[str, Concept],
         concept_images: dict[str, Image],
         current_dataset_tags: dict[str, list[str]]
@@ -117,17 +117,9 @@ def flatten_dataset(
     unique_prompts: list[str] = []
     unique_tags: list[str] = []
 
-    dataset_dst = os.path.join(dst, "dataset")
-    if os.path.exists(dataset_dst):
-        confirmation = messagebox.askyesno(title="Confirmation",
-                                           message="Are you sure you want to overwrite this directory?")
-
-        if confirmation:
-            shutil.rmtree(dataset_dst)
-
     os.makedirs(dataset_dst, exist_ok=True)
 
-    ci_count = len(concept_images)
+    captioned_images = []
     for c_img in concept_images:
         concept_image = concept_images[c_img]
 
@@ -143,6 +135,9 @@ def flatten_dataset(
 
         shutil.copyfile(img_path, os.path.join(dataset_dst, f"{filename}{extension}"))
         str_tags, tags = write_tags(tags_file_path, tags, special_tags)
+
+        captioned_image = CaptionedImage(concept_image.concept, img_path, tags)
+        captioned_images.append(captioned_image)
 
         if str_tags not in unique_prompts:
             unique_prompts.append(str_tags)
@@ -160,10 +155,49 @@ def flatten_dataset(
     unique_tags_path = os.path.join(dst, "unique_concept_tags.txt")
     write_tags(unique_tags_path, unique_tags)
 
-    messagebox.showinfo(
-        title="Flatten Dataset Complete",
-        message=f"Flattened {ci_count:,} images."
-    )
+    return captioned_images
+
+
+def save_dataset(
+        concepts: [dict, Concept],
+        concept_images: [dict, ConceptImage],
+        current_dataset_tags: dict[str, list[str]]
+) -> int:
+    touched = 0
+    for modified in current_dataset_tags:
+        if modified in concept_images:
+            concept_image = concept_images[modified]
+            parent_concept = concept_image.concept
+            special_tags = parent_concept.special_tags
+
+            m_tags = current_dataset_tags[modified]
+            if len(m_tags) > 0:
+                touched += 1
+                img_dir = parent_concept.working_directory
+                tags_txt_file = os.path.join(img_dir, f"{concept_image.get_filename(0)}.txt")
+                write_tags(tags_txt_file, m_tags, special_tags)
+
+        elif modified in concepts:
+            concept = concepts[modified]
+            c_name = concept.name.replace("_", " ")
+
+            m_tags = current_dataset_tags[modified]
+            r_tags = concept.raw_tags
+
+            if "__folder__" in r_tags:
+                for mt_idx in range(len(m_tags)):
+                    mt = m_tags[mt_idx]
+                    if mt == c_name:
+                        m_tags[mt_idx] = "__folder__"
+                        break
+
+            if len(m_tags) > 0:
+                touched += 1
+                w_dir = concept.working_directory
+                tags_txt_file = os.path.join(w_dir, "__prompt.txt")
+                write_tags(tags_txt_file, m_tags)
+
+    return touched
 
 
 def get_image_tags(
@@ -190,13 +224,13 @@ def get_concept_tags(
     target_concept = concepts[canonical_concept]
 
     parent_tags: (list[str], list[str]) = get_concept_tags(
-        target_concept.parent.canonical_name,
-        concepts,
-        current_dataset_tags
+            target_concept.parent.canonical_name,
+            concepts,
+            current_dataset_tags
     ) if target_concept.parent is not None else ([], [])
 
     return normalize_tags(
-        target_concept.concept_tags
-        if canonical_concept not in current_dataset_tags
-        else current_dataset_tags[canonical_concept]
+            target_concept.concept_tags
+            if canonical_concept not in current_dataset_tags
+            else current_dataset_tags[canonical_concept]
     ), normalize_tags(parent_tags[1] + parent_tags[0])
