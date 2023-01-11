@@ -9,14 +9,6 @@ from fking.fking_captions import Concept, ConceptImage
 from fking.fking_utils import normalize_tags, write_tags
 
 
-def load_concept_images(images: list[ConceptImage]) -> list[Image]:
-    return [load_concept_image(image) for image in images]
-
-
-def load_concept_image(image: ConceptImage) -> Image:
-    return load_image(image.get_canonical_name())
-
-
 def load_image(
         canonical: str,
         image_cache: dict[str, Image],
@@ -35,6 +27,51 @@ def load_image(
     image_cache[canonical] = image
 
     return image
+
+
+def load_concept_grid(
+        canonical: str,
+        image_cache: dict[str, Image],
+        concepts: dict[str, Concept],
+        concept_images: [dict, ConceptImage],
+        max_images: int,
+        image_size: int
+) -> Image:
+    if canonical not in image_cache:
+        total = 0
+        selected_concept_images = []
+
+        try:
+            for key in concepts:
+                if key == canonical or key.startswith(canonical):
+                    c = concepts[key]
+                    for ci in c.images:
+                        ciid = ci.get_canonical_name()
+                        ci_img = load_image(ciid, image_cache, concept_images, image_size)
+                        selected_concept_images.append(ci_img)
+                        total += 1
+
+                        if total >= max_images:
+                            raise StopIteration  # really python, no labeled loops?
+
+        except StopIteration:
+            # NOP
+            pass
+
+        sel_ci_length = len(selected_concept_images)
+        if sel_ci_length > 0:
+            max_image_selection = min(sel_ci_length, max_images)
+
+            concept_grid = create_image_grid(selected_concept_images[:max_image_selection], image_size)
+            image_cache[canonical] = concept_grid
+
+            return concept_grid
+        else:
+            transparent_img = Image.new("RGBA", (image_size, image_size), (0, 0, 0, 0))
+            image_cache[canonical] = transparent_img
+            return transparent_img
+    else:
+        return image_cache[canonical]
 
 
 def create_image_grid(images: list[Image], target_size: int = 512):

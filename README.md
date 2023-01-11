@@ -12,7 +12,7 @@ The captioning util is a hierarchical based captioner, it will apply the tags of
 subdirectories and images.
 Each directory can contain a text file named `__prompt.txt`, all text in this file will be prepended to all child
 images, and subdirectories and their images.
-Using `__folder__` in the `__prompt.txt` file will automatically use the parent directory's name.
+Using `__folder__` in the `__prompt.txt` file will automatically use the directory's name.
 
 **Example File Tree**
 

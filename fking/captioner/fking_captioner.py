@@ -6,8 +6,8 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageTk
 
-from fking.captioner.fk_captioning_utils import create_image_grid, flatten_dataset, get_concept_tags, get_image_tags, \
-    load_image
+from fking.captioner.fk_captioning_utils import flatten_dataset, get_concept_tags, get_image_tags, \
+    load_image, load_concept_grid
 from fking.fking_captions import Concept, ConceptImage, create_concept
 from fking.fking_utils import is_image, normalize_tags, write_tags
 
@@ -36,10 +36,11 @@ current_dataset_tags: dict[str, list[str]] = {}
 
 last_modified_tags: list[str] = []
 
-transparent_img = ImageTk.PhotoImage(Image.new("RGBA", (512, 512), (0, 0, 0, 0)))
+image_preview_size = 768
+transparent_img = ImageTk.PhotoImage(Image.new("RGBA", (image_preview_size, image_preview_size), (0, 0, 0, 0)))
 active_img: None | ImageTk.PhotoImage = transparent_img
 
-max_load_concept_images = 81  # sqrt 9, so 9x9 image grid
+max_load_concept_images = 100  # 10x10 image grid
 active_concept_image: ConceptImage | None = None
 
 active_parent_tags: list[str] = []
@@ -87,41 +88,21 @@ def set_active_image(canonical_img: str):
 def set_active_concept(canonical_concept: str):
     global active_img_tags, active_parent_tags, active_img, active_concept_image
 
-    label_image_preview['image'] = transparent_img
-
     active_img_tags = None
     active_concept_image = None
 
     target_concept = concepts[canonical_concept]
+    concept_grid = load_concept_grid(
+        canonical_concept,
+        image_cache,
+        concepts,
+        concept_images,
+        max_load_concept_images,
+        image_preview_size
+    )
 
-    total = 0
-    selected_concept_images = []
-
-    try:
-        for key in concepts:
-            if key == canonical_concept or key.startswith(canonical_concept):
-                c = concepts[key]
-                for ci in c.images:
-                    ciid = ci.get_canonical_name()
-                    ci_img = load_image(ciid, image_cache, concept_images)
-                    selected_concept_images.append(ci_img)
-                    total += 1
-
-                    if total >= max_load_concept_images:
-                        raise StopIteration  # really python, no labeled loops?
-
-    except StopIteration:
-        # NOP
-        pass
-
-    sel_ci_length = len(selected_concept_images)
-    if sel_ci_length > 0:
-        max_image_selection = min(sel_ci_length, max_load_concept_images)
-        concept_grid = create_image_grid(selected_concept_images[:max_image_selection])
-        concept_grid = ImageTk.PhotoImage(concept_grid)
-
-        active_img = concept_grid
-        label_image_preview["image"] = active_img
+    active_img = ImageTk.PhotoImage(concept_grid)
+    label_image_preview["image"] = active_img
 
     active_img_tags, active_parent_tags = get_concept_tags(canonical_concept, concepts, current_dataset_tags)
 
@@ -147,6 +128,9 @@ def on_menu_item_open(event=None):
     global working_concept, working_directory
 
     src = filedialog.askdirectory()
+    if src is None or len(src) <= 0:
+        return
+
     load_concept_tree(src)
 
 
@@ -480,6 +464,7 @@ def build_tree(concept: Concept):
         treeview_concept.insert(parent, position, iid, text=text)
 
     treeview_concept.item(root_concept, open=True)
+    load_concept_grid(root_concept, image_cache, concepts, concept_images, max_load_concept_images, image_preview_size)
 
     menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
     menu_file.entryconfig("Save Dataset", state=tk.NORMAL)
@@ -537,7 +522,7 @@ treeview_concept.grid(row=0, column=0, sticky="news", padx=(padding_size, paddin
 
 treeview_concept.bind('<<TreeviewSelect>>', on_tree_view_child_click)
 
-root.grid_rowconfigure(0, minsize=512, weight=1)
+root.grid_rowconfigure(0, minsize=image_preview_size, weight=1)
 root.grid_rowconfigure(1, minsize=32)
 root.grid_rowconfigure(2, minsize=32 - padding_size)
 root.grid_rowconfigure(3, minsize=32 - padding_size)
@@ -546,7 +531,7 @@ root.grid_rowconfigure(5, minsize=32 - padding_size)
 root.grid_rowconfigure(6, minsize=32 - padding_size)
 
 root.grid_columnconfigure(0, minsize=256)
-root.grid_columnconfigure(1, minsize=512 - 124, weight=1)
+root.grid_columnconfigure(1, minsize=image_preview_size - 124, weight=1)
 root.grid_columnconfigure(2, minsize=124)
 
 label_image_preview = ttk.Label(padding=(0, 0))
