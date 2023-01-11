@@ -45,6 +45,17 @@ active_concept_image: ConceptImage | None = None
 active_parent_tags: list[str] = []
 active_img_tags: list[str] = []
 
+active_title_fragment = None
+
+
+def is_modified() -> bool:
+    for key in current_dataset_tags.keys():
+        value = current_dataset_tags[key]
+        if value is not None and len(value) > 0:
+            return True
+
+    return False
+
 
 def set_active_image(canonical_img: str):
     global active_img, active_img_tags, active_concept_image, active_parent_tags
@@ -123,10 +134,13 @@ def set_active_concept(canonical_concept: str):
 
 
 def set_title(title: str | None = None):
+    global active_title_fragment
     if not title:
         set_title("a fking hierarchical dataset editor")
     else:
-        root.title(f'fking captioner - {title}')
+        active_title_fragment = title
+        modified_star = "*" if is_modified() else ""
+        root.title(f"{modified_star}fking captioner - {title}")
 
 
 def on_menu_item_open(event=None):
@@ -152,16 +166,37 @@ def load_concept_tree(src_dir: str) -> Concept:
 
 
 def on_menu_item_flatten(event=None):
+    if working_concept is None:
+        return
+
+    if is_modified():
+        if messagebox.askyesno(
+                title="Save Dataset",
+                message="Would you like to save the dataset before flattening?"
+                        "\nThis is not required, and is irreversible."
+        ):
+            do_save()
+
     dst_directory = filedialog.askdirectory()
     if dst_directory is not None and len(dst_directory) > 0:
         flatten_dataset(dst_directory, concepts, concept_images, current_dataset_tags)
 
 
 def on_menu_item_save(event=None):
-    if not messagebox.askyesno("Confirm Save",
-                               "Saving will write changes to your dataset, are you sure you want to continue?"):
+    if working_concept is None:
         return
 
+    if not messagebox.askyesno(
+            title="Confirm Save",
+            message="Saving will write changes to your dataset, are you sure you want to continue?"
+                    "\nThis action is irreversible."
+    ):
+        return
+    else:
+        do_save()
+
+
+def do_save():
     tree_sel = treeview_concept.selection()
     if tree_sel is not None and len(tree_sel) > 0:
         tree_sel = tree_sel[0]
@@ -255,6 +290,8 @@ def on_save_button(event):
     current_dataset_tags[tree_sel] = tags
     last_modified_tags = tags
 
+    set_title(active_title_fragment)
+
 
 def tags_from_text_field():
     tt = text_image_tags_field.get(1.0, tk.END)
@@ -288,7 +325,7 @@ def open_tree_item(iid: str):
     treeview_concept.selection_set(iid)
     treeview_concept.focus(iid)
 
-    concept = sorted_concept_images[iid].concept
+    concept = sorted_concept_images[iid].concept if iid in sorted_concept_images else concepts[iid]
 
     # event listener is firing this
     # set_active_image(iid)
@@ -305,7 +342,12 @@ def on_paste_button(event=None):
 
 
 def on_request_exit(event=None):
-    if messagebox.askyesno(title="Confirm Exit", message="Are you sure you want to exit?"):
+    nl = '\n'
+    if working_concept is None or messagebox.askyesno(
+            title="Confirm Exit",
+            message=f"Are you sure you want to exit? "
+                    f"{f'{nl}You have unsaved changes.' if is_modified() else ''}".strip()
+    ):
         root.destroy()
 
 
@@ -541,6 +583,6 @@ button_next.bind("<Button-1>", on_next_button)
 
 
 def show_ui():
-    root.pack_slaves()
+    root.focus_force()
     root.config(menu=menubar)
     root.mainloop()

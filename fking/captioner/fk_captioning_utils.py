@@ -90,6 +90,7 @@ def flatten_dataset(
 
     os.makedirs(dataset_dst, exist_ok=True)
 
+    ci_count = len(concept_images)
     for c_img in concept_images:
         concept_image = concept_images[c_img]
 
@@ -122,6 +123,11 @@ def flatten_dataset(
     unique_tags_path = os.path.join(dst, "unique_concept_tags.txt")
     write_tags(unique_tags_path, unique_tags)
 
+    messagebox.showinfo(
+        title="Flatten Dataset Complete",
+        message=f"Flattened {ci_count:,} images."
+    )
+
 
 def get_image_tags(
         canonical_img: str,
@@ -147,13 +153,13 @@ def get_concept_tags(
     target_concept = concepts[canonical_concept]
 
     parent_tags: (list[str], list[str]) = get_concept_tags(
-            target_concept.parent.canonical_name,
-            concepts,
-            current_dataset_tags
+        target_concept.parent.canonical_name,
+        concepts,
+        current_dataset_tags
     ) if target_concept.parent is not None else ([], [])
 
     return normalize_tags(
-            target_concept.concept_tags
-            if canonical_concept not in current_dataset_tags
-            else current_dataset_tags[canonical_concept]
+        target_concept.concept_tags
+        if canonical_concept not in current_dataset_tags
+        else current_dataset_tags[canonical_concept]
     ), normalize_tags(parent_tags[1] + parent_tags[0])
