@@ -28,8 +28,8 @@ class CaptionedImage(FkingImage):
 
 
 class ConceptImage(FkingImage):
-    def __init__(self, concept, path, tags: list[str] = []) -> None:
-        super().__init__(concept, path, tags)
+    def __init__(self, concept, path, tags: list[str] = None) -> None:
+        super().__init__(concept, path, [] if tags is None else tags)
 
     def generate_tags(self):
         c_tags = self.tags[:]

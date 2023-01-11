@@ -7,7 +7,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageTk
 
-from fking.captioner.fk_captioning_utils import flatten_dataset, get_concept_tags, get_image_tags, load_concept_grid, \
+from fking.captioner.fk_captioning_utils import flatten_dataset, get_concept_tags, get_image_tags, load_concept_image, \
     load_image, save_dataset
 from fking.fking_captions import Concept, ConceptImage, create_concept
 from fking.fking_utils import is_image, normalize_tags
@@ -220,7 +220,7 @@ def __set_active_image(canonical_img: str):
     active_img_tags, active_parent_tags = get_image_tags(canonical_img, concepts, concept_images, current_dataset_tags)
     __set_tags_text(active_img_tags, active_parent_tags)
 
-    image = load_image(canonical_img, image_cache, concept_images)
+    image = load_image(active_concept_image, image_cache, image_preview_size)
     img_tk = ImageTk.PhotoImage(image)
     active_img = img_tk
 
@@ -235,14 +235,7 @@ def __set_active_concept(canonical_concept: str):
     active_concept_image = None
 
     target_concept = concepts[canonical_concept]
-    concept_grid = load_concept_grid(
-            canonical_concept,
-            image_cache,
-            concepts,
-            concept_images,
-            max_load_concept_images,
-            image_preview_size
-    )
+    concept_grid = load_concept_image(target_concept, image_cache, max_load_concept_images, image_preview_size)
 
     active_img = ImageTk.PhotoImage(concept_grid)
     label_image_preview["image"] = active_img
@@ -398,15 +391,6 @@ def __build_tree(concept: Concept):
                     return -1
                 else:
                     return 1
-
-            # if a_numeric and b_numeric:
-            #     if a_val == b_val:
-            #         return compare(a_ext[1:], b_ext[1:])
-            #     elif a_val < b_val:
-            #         return -1
-            #     else:
-            #         return 1
-
             elif a == b:
                 return 0
             elif a < b:

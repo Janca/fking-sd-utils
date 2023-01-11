@@ -8,69 +8,50 @@ from fking.fking_captions import CaptionedImage, Concept, ConceptImage
 from fking.fking_utils import normalize_tags, write_tags
 
 
-def load_image(
-        canonical: str,
-        image_cache: dict[str, Image],
-        concept_image: dict[str, ConceptImage],
-        size: int = 512
-) -> Image:
-    if canonical in image_cache:
-        print(f"Found image '{canonical}' in image cache.")
-        return image_cache[canonical]
+def load_image(concept_image: ConceptImage, image_cache: dict[str, Image], max_size: int) -> Image:
+    c_img_name = concept_image.get_canonical_name()
+    if c_img_name in image_cache:
+        return image_cache[c_img_name]
 
-    print(f"Loading image '{canonical}' from disk")
-    target_image = concept_image[canonical]
-    target_image_path = target_image.path
+    c_img = Image.open(concept_image.path).resize(size=(max_size, max_size), resample=Image.Resampling.LANCZOS)
+    image_cache[c_img_name] = c_img
 
-    image = Image.open(target_image_path).resize((size, size), Image.Resampling.LANCZOS)
-    image_cache[canonical] = image
-
-    return image
+    return c_img
 
 
-def load_concept_grid(
-        canonical: str,
-        image_cache: dict[str, Image],
-        concepts: dict[str, Concept],
-        concept_images: [dict, ConceptImage],
-        max_images: int,
-        image_size: int
-) -> Image:
-    if canonical not in image_cache:
-        total = 0
-        selected_concept_images = []
+def load_concept_image(concept: Concept, image_cache: dict[str, Image], max_images: int, max_size: int) -> Image:
+    c_name = concept.canonical_name
+    if c_name in image_cache:
+        return image_cache[c_name]
 
-        try:
-            for key in concepts:
-                if key == canonical or key.startswith(canonical):
-                    c = concepts[key]
-                    for ci in c.images:
-                        ciid = ci.get_canonical_name()
-                        ci_img = load_image(ciid, image_cache, concept_images, image_size)
-                        selected_concept_images.append(ci_img)
-                        total += 1
+    concepts, concept_images = get_concept_child_hierarchy(concept)
+    concepts = [c for c in concepts if len(c.images) > 0]
 
-                        if total >= max_images:
-                            raise StopIteration  # really python, no labeled loops?
+    image_per_concept = max(round(max_images / len(concepts)), 1)
+    selected_images = []
 
-        except StopIteration:
-            # NOP
-            pass
+    try:
+        for c in concepts:
+            c_img_len = len(c.images)
+            for i in range(min(image_per_concept, c_img_len)):
+                c_img = c.images[i]
+                c_img_canonical = c_img.get_canonical_name()
 
-        sel_ci_length = len(selected_concept_images)
-        if sel_ci_length > 0:
-            max_image_selection = min(sel_ci_length, max_images)
+                if c_img_canonical in image_cache:
+                    selected_images.append(image_cache[c_img_canonical])
+                else:
+                    loaded_image = load_image(c_img, image_cache, max_size)
+                    selected_images.append(loaded_image)
 
-            concept_grid = create_image_grid(selected_concept_images[:max_image_selection], image_size)
-            image_cache[canonical] = concept_grid
+                if len(selected_images) >= max_images:
+                    raise StopIteration
+    except StopIteration:
+        pass
 
-            return concept_grid
-        else:
-            transparent_img = Image.new("RGBA", (image_size, image_size), (0, 0, 0, 0))
-            image_cache[canonical] = transparent_img
-            return transparent_img
-    else:
-        return image_cache[canonical]
+    concept_grid = create_image_grid(selected_images, max_size)
+    image_cache[c_name] = concept_grid
+
+    return concept_grid
 
 
 def create_image_grid(images: list[Image], target_size: int = 512):
@@ -234,3 +215,22 @@ def get_concept_tags(
             if canonical_concept not in current_dataset_tags
             else current_dataset_tags[canonical_concept]
     ), normalize_tags(parent_tags[1] + parent_tags[0])
+
+
+def get_concept_child_hierarchy(
+        concept: Concept,
+        include_self: bool = True
+) -> tuple[list[Concept], list[ConceptImage]]:
+    concepts: list[Concept] = [concept] if include_self else []
+    concept_images: list[ConceptImage] = [concept.images] if include_self else []
+
+    for child in concept.children:
+        concepts.append(child)
+        concept_images.extend(child.images)
+
+        child_concepts, child_concept_images = get_concept_child_hierarchy(child, False)
+
+        concepts.extend(child_concepts)
+        concept_images.extend(child_concept_images)
+
+    return concepts, concept_images
