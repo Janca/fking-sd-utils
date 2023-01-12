@@ -8,7 +8,7 @@ from fking.fking_captions import create_concept, print_concept_info
 from fking.fking_utils import fix_prompt_text_files, generate_prompt_list, prompt_warning, write_tags
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--no-ui", default=True, dest="use_ui", action='store_false')
+parser.add_argument("--no-gui.py", default=True, dest="use_ui", action='store_false')
 parser.add_argument("-i", "--input", type=str)
 parser.add_argument("-o", "--output", type=str, default=None)
 parser.add_argument("--overwrite", default=False, dest="overwrite", action='store_true')
