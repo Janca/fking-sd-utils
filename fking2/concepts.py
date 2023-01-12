@@ -58,3 +58,22 @@ def get_canonical_name(fk: FkConcept | FkConceptImage) -> str:
         fkp = fkp.parent
 
     return canonical_name
+
+
+def get_concept_hierarchy(fk: FkConcept | FkConceptImage, depth: int = None) -> list[FkConcept | FkConceptImage]:
+    concept = fk if isinstance(fk, FkConcept) else fk.concept
+    hierarchy: list[FkConcept | FkConceptImage] = [concept]
+
+    parent = concept.parent
+    while parent is not None:
+        hierarchy.append(parent)
+        parent = parent.parent
+
+    hierarchy.reverse()
+
+    if depth is None or depth == 0:
+        return hierarchy
+    elif depth < 0:
+        return hierarchy[:depth or None]
+    else:
+        return hierarchy[depth:]
