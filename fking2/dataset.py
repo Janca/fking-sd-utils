@@ -18,6 +18,9 @@ class FkDataset:
         _concept: FkConcept
         _canonical_name: str
 
+        def __init__(self, dataset: FkDataset) -> None:
+            self._dataset = dataset
+
         def reset_tags(self):
             self._tags = self._original_tags[:]
             self._modified = False
@@ -41,14 +44,14 @@ class FkDataset:
 
         @property
         def modified(self) -> bool:
-            return self._modified
+            return self.modified
 
         @property
         def tags(self) -> CaptionList:
             return self._tags[:]
 
     class WorkingConcept(IWorkingDatum):
-        def __init__(self, concept: FkConcept):
+        def __init__(self, dataset: FkDataset, concept: FkConcept):
             self._concept = concept
             self._canonical_name = concept.canonical_name
             self._name = concept.name
@@ -57,12 +60,14 @@ class FkDataset:
             self._original_tags = concept.read_tags()
             self._tags = self._original_tags[:]
 
+            super().__init__(dataset)
+
         @property
         def name(self):
             return self._name
 
     class WorkingImage(IWorkingDatum):
-        def __init__(self, concept: FkDataset.WorkingConcept, image: FkConceptImage):
+        def __init__(self, dataset: FkDataset, concept: FkDataset.WorkingConcept, image: FkConceptImage):
             self._concept = concept.concept
             self._working_concept = concept
             self._canonical_name = image.canonical_name
@@ -71,16 +76,22 @@ class FkDataset:
             self._original_tags = image.read_tags()
             self._tags = self._original_tags[:]
 
+            super().__init__(dataset)
+
         @property
         def working_concept(self):
             return self._working_concept
 
     def __init__(self, root: FkConcept):
-        self.root = FkDataset.WorkingConcept(root)
+        self.root = FkDataset.WorkingConcept(self, root)
         self._working_set = build_working_set(self.root)
 
     @property
     def modified(self) -> bool:
+        for datum in self._working_set:
+            if self._working_set[datum].modified:
+                return True
+
         return False
 
     def get(self, canonical_name) -> FkDataset.IWorkingDatum:
