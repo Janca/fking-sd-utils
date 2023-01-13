@@ -1,6 +1,8 @@
 from fking2.dataset import FkDataset
 from fking2.preferences import FkPreferences
 
+version = "0.0.2"
+
 
 class FkApp:
     _working_directory: str = None
