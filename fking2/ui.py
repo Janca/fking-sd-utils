@@ -1,11 +1,12 @@
-import os
-import sys
 import tkinter as tk
 import tkinter.ttk as ttk
 
 import fking2.app as fkapp
+import fking2.dialogs as fkdiag
+import fking2.utils as fkutils
 from fking2.app import FkApp
 
+from tkinterdnd2 import TkinterDnD
 
 class FkFrame:
     _root: tk.Tk
@@ -75,7 +76,7 @@ class FkFrame:
         #
         # root.protocol("WM_DELETE_WINDOW", on_request_exit)
 
-        ico_img = load_ico("icon.ico")
+        ico_img = fkutils.load_ico("icon.ico")
         self._root.iconbitmap(ico_img)
 
     def __init_grid(self):
@@ -111,19 +112,21 @@ class FkFrame:
         self._toolbar_concept_tools = tk.Frame(self._frame, borderwidth=1, relief=tk.FLAT)
         self._toolbar_concept_tools.grid(row=1, column=0, sticky="news", pady=(6, 0))
 
-        self._new_concept_ico = get_ico("new-folder.png")
+        self._new_concept_ico = fkutils.get_ico("new-folder.png")
         self._button_concept_tree_new_concept = tk.Button(self._toolbar_concept_tools, image=self._new_concept_ico,
-                                                          height=24, width=24, relief="flat")
+                                                          height=24, width=24, relief="flat",
+                                                          command=self.__on_button_new_concept)
 
-        self._new_image_ico = get_ico("new-image.png")
+        self._new_image_ico = fkutils.get_ico("new-image.png")
         self._button_concept_tree_new_image = tk.Button(self._toolbar_concept_tools, image=self._new_image_ico,
-                                                        height=24, width=24, relief="flat")
+                                                        height=24, width=24, relief="flat",
+                                                        command=self.__on_button_dnd_zone)
 
-        self._edit_ico = get_ico("edit.png")
+        self._edit_ico = fkutils.get_ico("edit.png")
         self._button_concept_tree_edit = tk.Button(self._toolbar_concept_tools, image=self._edit_ico,
                                                    height=24, width=24, relief="flat")
 
-        self._refresh_ico = get_ico("refresh.png")
+        self._refresh_ico = fkutils.get_ico("refresh.png")
         self._button_concept_tree_refresh = tk.Button(self._toolbar_concept_tools, image=self._refresh_ico,
                                                       height=24, width=24, relief="flat")
 
@@ -157,9 +160,9 @@ class FkFrame:
         frame_tag_editor_actions.grid_columnconfigure(0, weight=0)
         frame_tag_editor_actions.grid_columnconfigure(1, weight=0)
 
-        self._paste_ico = get_ico("paste.png")
-        self._previous_ico = get_ico("left.png")
-        self._next_ico = get_ico("right.png")
+        self._paste_ico = fkutils.get_ico("paste.png")
+        self._previous_ico = fkutils.get_ico("left.png")
+        self._next_ico = fkutils.get_ico("right.png")
 
         self._button_tag_editor_paste = tk.Button(frame_tag_editor_actions, compound=tk.LEFT,
                                                   image=self._paste_ico, text="Paste", padx=3)
@@ -193,16 +196,8 @@ class FkFrame:
             version = f"v{fkapp.version}"
             self._root.title(f"{modified_star}fking captioner {version} - {fragment}")
 
+    def __on_button_new_concept(self):
+        name, tags = fkdiag.create_new_concept(self._root)
 
-def load_ico(relative_path: str):
-    target_image = relative_path
-    if not hasattr(sys, "frozen"):
-        target_image = os.path.join(os.path.dirname(__file__), os.path.normpath(f"ui/{target_image}"))
-    else:
-        target_image = os.path.join(sys.prefix, target_image)
-    return target_image
-
-
-def get_ico(icon: str):
-    ico = load_ico(icon)
-    return tk.PhotoImage(file=ico)
+    def __on_button_dnd_zone(self):
+        fkdiag.drag_and_drop(self._root)

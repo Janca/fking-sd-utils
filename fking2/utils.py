@@ -1,4 +1,9 @@
 import os
+import sys
+
+import tkinter as tk
+
+from PIL import Image, ImageTk
 
 
 def normalize_tags(tags: list[str]) -> list[str]:
@@ -33,3 +38,17 @@ def is_image(path: str) -> bool:
 
     ext = os.path.splitext(path)[1]
     return ext in [".png", ".jpg", ".jpeg"]
+
+
+def load_ico(relative_path: str):
+    target_image = relative_path
+    if not hasattr(sys, "frozen"):
+        target_image = os.path.join(os.path.dirname(__file__), os.path.normpath(f"ui/{target_image}"))
+    else:
+        target_image = os.path.join(sys.prefix, target_image)
+    return target_image
+
+
+def get_ico(icon: str):
+    ico = load_ico(icon)
+    return tk.PhotoImage(file=ico)
