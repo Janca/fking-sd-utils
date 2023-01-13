@@ -40,11 +40,11 @@ class FkDataset:
 
         @property
         def concept(self) -> FkConcept:
-            return self.concept
+            return self._concept
 
         @property
         def modified(self) -> bool:
-            return self.modified
+            return self._modified
 
         @property
         def tags(self) -> CaptionList:
