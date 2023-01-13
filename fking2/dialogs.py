@@ -9,8 +9,8 @@ import fking2.utils as fkutils
 
 
 class _NewConceptDialog(simpledialog.Dialog):
-    e1: tk.Text
-    e2: tk.Text
+    textfield_concept_name: tk.Text
+    textfield_concept_tags: tk.Text
 
     name: str = None
     tags: list[str] = None
@@ -19,25 +19,35 @@ class _NewConceptDialog(simpledialog.Dialog):
     _button_cancel: tk.Button
 
     def body(self, master):
+        self.resizable(False, False)
+
         tk.Label(master, text="Concept Name", anchor=tk.W, justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
         self.grid_columnconfigure(0, minsize=196, weight=0)
+        self.grid_columnconfigure(1, weight=0)
 
         img_ico = fkutils.load_ico("icon.ico")
         self.iconbitmap(img_ico)
         self.title(f"fking captioner v{fkapp.version} - Create Concept")
 
-        self.e1 = tk.Text(master, height=1, width=48)
-        self.e1.grid(row=1, column=0, sticky=tk.NSEW)
+        self.textfield_concept_name = tk.Text(master, height=1, width=48)
+        self.textfield_concept_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
 
         tk.Label(master, text="Concept Tags", anchor=tk.W, justify=tk.LEFT).grid(
-            row=2, column=0, sticky=tk.W, pady=(6, 0)
+            row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0)
         )
 
-        self.e2 = tk.Text(master, height=6, width=48)
-        self.e2.insert(tk.END, "__folder__")
-        self.e2.grid(row=3, column=0, sticky=tk.NSEW)
+        self.textfield_concept_tags = tk.Text(master, height=6, width=48)
+        self.textfield_concept_tags.insert(tk.END, "__folder__")
+        self.textfield_concept_tags.grid(row=3, column=0, sticky=tk.NSEW)
 
-        return self.e1
+        scrollbar_textfield_concept_tags = tk.Scrollbar(master, orient=tk.VERTICAL,
+                                                        command=self.textfield_concept_tags.yview)
+
+        self.textfield_concept_tags.config(yscrollcommand=scrollbar_textfield_concept_tags.set)
+
+        scrollbar_textfield_concept_tags.grid(row=3, column=1, sticky=tk.NSEW)
+
+        return self.textfield_concept_name
 
     def buttonbox(self):
         frame = tk.Frame(self, padx=0, pady=0)
@@ -51,8 +61,8 @@ class _NewConceptDialog(simpledialog.Dialog):
         frame.pack(side=tk.RIGHT, padx=6, pady=0)
 
     def __on_ok_button(self):
-        textfield_name = self.e1.get(1.0, tk.END)
-        textfield_tags = self.e2.get(1.0, tk.END).split(',')
+        textfield_name = self.textfield_concept_name.get(1.0, tk.END)
+        textfield_tags = self.textfield_concept_tags.get(1.0, tk.END).split(',')
 
         self.name = textfield_name.strip()
         self.tags = fkutils.normalize_tags(textfield_tags)
@@ -64,9 +74,6 @@ class _NewConceptDialog(simpledialog.Dialog):
 
 
 class _ConceptImageDropZoneDialog(simpledialog.Dialog):
-    class DropFrame(tkinterdnd2.TkinterDnD.DnDWrapper, tk.Frame):
-        pass
-
     _button_ok: tk.Button
     _button_cancel: tk.Button
 
@@ -83,6 +90,7 @@ class _ConceptImageDropZoneDialog(simpledialog.Dialog):
     def body(self, master):
         # noinspection PyProtectedMember
         tkinterdnd2.TkinterDnD._require(self)
+        self.resizable(False, False)
 
         tk.Label(master, text="Concept Name", anchor=tk.W, justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
         self.grid_columnconfigure(0, minsize=196, weight=0)
