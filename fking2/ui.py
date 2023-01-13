@@ -1,11 +1,15 @@
 import tkinter as tk
+import tkinter.messagebox
 import tkinter.ttk as ttk
-from typing import Callable, TypeVar
+from typing import Optional
+
+from PIL import Image, ImageTk
 
 import fking2.app as fkapp
 import fking2.dialogs as fkdiag
 import fking2.utils as fkutils
 from fking2.app import FkApp
+from fking2.dataset import FkDataset
 
 
 class FkFrame:
@@ -28,16 +32,27 @@ class FkFrame:
 
     _combobox_preview_size: ttk.Combobox
 
+    _previous_preview_size: str = " 512px"
+    _values_combobox_preview_size: list[str] = [
+        " 512px", " 640px", " 768px"
+    ]
+
     _label_image_preview: tk.Label
+    _image_transparent_image: Optional[tk.PhotoImage]
 
     _textfield_parent_tags: tk.Text
     _textfield_tags: tk.Text
 
     _toolbar_concept_tools: tk.Frame
 
+    _active_datum: Optional[FkDataset.IWorkingDatum]
+
     def __init__(self, app: FkApp):
         super().__init__()
         self._app = app
+
+        self._image_transparent_image = None
+        self._active_datum = None
 
         self.__init_frame()
         self.__init_grid()
@@ -59,6 +74,11 @@ class FkFrame:
         self._menu_file = tk.Menu(self._menubar)
         self._menubar.add_cascade(label="File", menu=self._menu_file)
 
+        self._menu_file.add_command(label="New Dataset", command=self.__on_menu_item_new_dataset,
+                                    underline=True, accelerator="Ctrl+N")
+
+        self._menu_file.add_separator()
+
         self._menu_file.add_command(label="Open Dataset", underline=True, accelerator="Ctrl+O")
         self._menu_file.add_command(label="Save Dataset", underline=True, accelerator="Ctrl+S")
 
@@ -78,13 +98,11 @@ class FkFrame:
         #
         # root.protocol("WM_DELETE_WINDOW", on_request_exit)
 
-        ico_img = fkutils.load_ico("icon.ico")
+        ico_img = fkutils.find_image("icon.ico")
         self._root.iconbitmap(ico_img)
 
     def __init_grid(self):
         # PREVIEW IMAGE
-        print(f"Configuring preview pane as "
-              f"{(self._app.preferences.image_preview_size, self._app.preferences.image_preview_size)}")
         self._frame.grid_rowconfigure(0, minsize=self._app.preferences.image_preview_size, weight=1)
         # BOTTOM TOOLBAR
         self._frame.grid_rowconfigure(1, minsize=24 + 6, weight=1)
@@ -116,21 +134,21 @@ class FkFrame:
         self._toolbar_concept_tools = tk.Frame(self._frame, borderwidth=1, relief=tk.FLAT)
         self._toolbar_concept_tools.grid(row=1, column=0, sticky="news", pady=(6, 0))
 
-        self._new_concept_ico = fkutils.get_ico("folder-new.png")
+        self._new_concept_ico = fkutils.get_photo_image("folder-new.png")
         self._button_concept_tree_new_concept = tk.Button(self._toolbar_concept_tools, image=self._new_concept_ico,
                                                           height=24, width=24, relief="flat",
                                                           command=self.__on_button_new_concept)
 
-        self._new_image_ico = fkutils.get_ico("insert-image.png")
+        self._new_image_ico = fkutils.get_photo_image("insert-image.png")
         self._button_concept_tree_new_image = tk.Button(self._toolbar_concept_tools, image=self._new_image_ico,
                                                         height=24, width=24, relief="flat",
                                                         command=self.__on_button_dnd_zone)
 
-        self._edit_ico = fkutils.get_ico("edit-rename.png")
+        self._edit_ico = fkutils.get_photo_image("edit-rename.png")
         self._button_concept_tree_edit = tk.Button(self._toolbar_concept_tools, image=self._edit_ico,
                                                    height=24, width=24, relief="flat")
 
-        self._refresh_ico = fkutils.get_ico("refresh.png")
+        self._refresh_ico = fkutils.get_photo_image("refresh.png")
 
         self._button_concept_tree_refresh = tk.Button(self._toolbar_concept_tools, image=self._refresh_ico,
                                                       height=24, width=24, relief="flat")
@@ -149,13 +167,13 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(0, weight=1)
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
-        frame_parent_tags, self._textfield_parent_tags = border_widget(
+        frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
                 frame_tag_editor,
                 lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
                 focus_color="#a0a0a0"
         )
 
-        frame_tags, self._textfield_tags = border_widget(
+        frame_tags, self._textfield_tags = fkutils.border_widget(
                 frame_tag_editor,
                 lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
@@ -175,10 +193,10 @@ class FkFrame:
         frame_tag_editor_actions.grid_columnconfigure(0, weight=0)
         frame_tag_editor_actions.grid_columnconfigure(1, weight=0)
 
-        self._paste_ico = fkutils.get_ico("paste.png")
-        self._apply_ico = fkutils.get_ico("dialog-ok-apply.png")
-        self._previous_ico = fkutils.get_ico("left.png")
-        self._next_ico = fkutils.get_ico("right.png")
+        self._paste_ico = fkutils.get_photo_image("paste.png")
+        self._apply_ico = fkutils.get_photo_image("dialog-ok-apply.png")
+        self._previous_ico = fkutils.get_photo_image("left.png")
+        self._next_ico = fkutils.get_photo_image("right.png")
 
         self._button_tag_editor_paste = tk.Button(frame_tag_editor_actions, compound=tk.LEFT,
                                                   image=self._paste_ico, text="Paste", padx=3)
@@ -201,7 +219,8 @@ class FkFrame:
         self._combobox_preview_size = ttk.Combobox(
                 frame_preview_size,
                 width=6,
-                values=["512px", "640px", "768px"]
+                values=self._values_combobox_preview_size,
+                justify=tk.CENTER
         )
 
         self._combobox_preview_size.current(0)
@@ -219,7 +238,10 @@ class FkFrame:
         self._root.deiconify()
 
         self.set_title()
+
         self.set_ui_state(False)
+        self.clear_image_preview()
+
         self._root.mainloop()
 
     def set_textfield_tags(self, tags: list[str], parent_tags: list[str]):
@@ -257,6 +279,24 @@ class FkFrame:
         self._button_tag_editor_next.configure(state=state)
         self._button_tag_editor_previous.configure(state=state)
 
+        self._textfield_tags.configure(state=state)
+
+    def refresh_image_preview(self):
+        if self._active_datum is None:
+            self.clear_image_preview()
+
+    def clear_image_preview(self):
+        transparent_image = get_transparency_image(
+                self._app.preferences.image_preview_size,
+                self._app.preferences.image_preview_size
+        )
+
+        self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
+        self._label_image_preview.configure(image=self._image_transparent_image)
+
+    def __on_menu_item_new_dataset(self):
+        name, working_directory = fkdiag.create_new_dataset(self._root)
+
     def __on_button_new_concept(self):
         name, tags = fkdiag.create_new_concept(self._root)
 
@@ -264,43 +304,64 @@ class FkFrame:
         fkdiag.drag_and_drop(self._root)
 
     def __on_combobox_preview_size(self, event):
-        selected_value = event.widget.get()
+        selected_value = event.widget.get()[1:]
         selected_int_value = int(selected_value[:-2])
         current_size = self._app.preferences.image_preview_size
+        current_sel = self._combobox_preview_size.current()
 
         if selected_int_value != current_size:
-            self._app.preferences.image_preview_size = selected_int_value
-
             root_geometry = self._root.winfo_geometry()
             _, x, y = root_geometry.split('+')
 
+            root_w = self._root.winfo_width()
+            root_h = self._root.winfo_height()
+
+            screen_width = self._root.winfo_screenwidth()
+            screen_height = self._root.winfo_screenheight()
+
             diff = current_size - selected_int_value
+            if (root_h - diff) > (screen_height - 98) or root_w - diff > screen_width:
+                if not tkinter.messagebox.askyesno(
+                        title="Dimension Out-of-Bounds",
+                        message=f"Setting the image previewer to '{selected_value}' will cause the"
+                                f"\nuser interface to continue past your screen edges."
+                                f"\n\nWould you like to continue?"
+                ):
+
+                    if self._previous_preview_size is not None:
+                        p_idx = self._values_combobox_preview_size.index(self._previous_preview_size)
+                        self._combobox_preview_size.current(p_idx)
+
+                    return
+
+            self._app.preferences.image_preview_size = selected_int_value
+            self._previous_preview_size = f" {selected_int_value}px"
+
             half_diff = int(diff / 2)
 
             x = max(0, (int(x) + half_diff))
             y = max(0, (int(y) + half_diff))
 
-            self._root.geometry(f"+{x}+{y}")
-
             self.__init_grid()
+
+            self.refresh_image_preview()
+
+            self._root.geometry(f"+{x}+{y}")
             self._root.focus()
 
 
-T = TypeVar("T")
+def get_transparency_image(width: int = 768, height: int = 768) -> Image:
+    canvas = Image.new("RGBA", size=(width, height), color=(0, 0, 0, 1))
+    transparent_img = fkutils.get_image("transparent_grid.png")
 
+    ti_width = transparent_img.width
+    ti_height = transparent_img.height
 
-def border_widget(
-        root,
-        fk: Callable[[tk.Frame], T],
-        color: str = "#a0a0a0",
-        thickness: int = 1,
-        focus_color: str = "#0078d4"
-) -> tuple[tk.Frame, T]:
-    f = tk.Frame(root, background=color, borderwidth=thickness)
-    widget = fk(f)
+    ti_x_repeats = round(width / ti_width)
+    ti_y_repeats = round(height / ti_height)
 
-    widget.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-    widget.bind("<FocusIn>", lambda e: f.configure(background=focus_color))
-    widget.bind("<FocusOut>", lambda e: f.configure(background=color))
+    for x in range(ti_x_repeats):
+        for y in range(ti_y_repeats):
+            canvas.paste(transparent_img, (x * ti_width, y * ti_height))
 
-    return f, widget
+    return canvas
