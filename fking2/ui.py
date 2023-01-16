@@ -1,5 +1,6 @@
 import os.path
 import tkinter as tk
+import tkinter.filedialog
 import tkinter.messagebox
 import tkinter.ttk as ttk
 from typing import Dict, Optional, Union
@@ -9,6 +10,7 @@ from PIL import ImageTk
 from PIL.Image import Image
 
 import fking2.app as fkapp
+import fking2.concepts as fkconcepts
 import fking2.dialogs as fkdiag
 import fking2.utils as fkutils
 from fking2.app import FkApp
@@ -61,6 +63,9 @@ class FkFrame:
 
     _current_status: tk.StringVar
     _last_status: Optional[str]
+    _last_status_temp: bool
+
+    _datum_info: tk.StringVar
 
     def __init__(self, app: FkApp):
         super().__init__()
@@ -74,6 +79,7 @@ class FkFrame:
         self._image_cache = {}
 
         self._last_status = None
+        self._last_status_temp = False
 
         self.__init_frame()
         self.__init_grid()
@@ -101,7 +107,9 @@ class FkFrame:
 
         self._menu_file.add_separator()
 
-        self._menu_file.add_command(label="Open Dataset", underline=True, accelerator="Ctrl+O")
+        self._menu_file.add_command(label="Open Dataset", command=self.__on_menu_item_open_dataset,
+                                    underline=True, accelerator="Ctrl+O")
+
         self._menu_file.add_command(label="Save Dataset", underline=True, accelerator="Ctrl+S")
 
         self._menu_file.add_separator()
@@ -267,12 +275,15 @@ class FkFrame:
         frame_status_bar = tk.Frame(self._frame)
 
         self._current_status = tk.StringVar(self._frame)
+        self._datum_info = tk.StringVar(self._frame)
+
         self._label_status_bar_status = tk.Label(frame_status_bar, justify=tk.LEFT, anchor=tk.W,
                                                  textvariable=self._current_status)
 
-        self._label_status_bar_status.pack(side=tk.LEFT)
+        self._label_status_bar_datum_info = tk.Label(frame_status_bar, justify=tk.RIGHT, anchor=tk.E,
+                                                     textvariable=self._datum_info)
 
-        self._label_status_bar_datum_info = tk.Label(frame_status_bar, justify=tk.RIGHT, anchor=tk.E)
+        self._label_status_bar_status.pack(side=tk.LEFT)
         self._label_status_bar_datum_info.pack(side=tk.RIGHT)
 
         frame_status_bar.grid(row=3, column=0, columnspan=3, pady=(6, 0), sticky=tk.NSEW)
@@ -296,9 +307,20 @@ class FkFrame:
         for widget, status_text in widgets:
             self.__bind_status_text(widget, status_text)
 
-    def set_status(self, status: str):
-        self._last_status = self._current_status.get()
+    def set_status(self, status: str, temp=False):
+        if not self._last_status_temp:
+            self._last_status = self._current_status.get()
+        self._last_status_temp = temp
         self._current_status.set(status)
+
+    def set_datum_info(self, datum: FkDataset.IWorkingDatum):
+        if isinstance(datum, FkDataset.WorkingImage):
+            img_dimensions = datum.get_meta('image_dimensions')
+            if img_dimensions:
+                w, h = img_dimensions
+                self._datum_info.set(f"Dimensions: ({w}x{h})")
+        else:
+            self._datum_info.set('')
 
     def set_preferences(self):
         preferences = self._app.preferences
@@ -377,7 +399,6 @@ class FkFrame:
         self._treeview_concepts.delete(*self._treeview_concepts.get_children())
 
         datum_keys = dataset.keys()
-        print(datum_keys)
 
         for key in datum_keys:
             datum = dataset.get(key)
@@ -391,7 +412,7 @@ class FkFrame:
                     '' if parent_concept is None else parent_concept.canonical_name,
                     tk.END,
                     datum.canonical_name,
-                    text=datum.name.replace('_', ' ').title()
+                    text=datum.name
             )
 
         self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
@@ -432,7 +453,9 @@ class FkFrame:
 
         self.set_concept_tools_ui_state(tk.NORMAL)
         self.set_textfield_tags(tag, parent_tags)
+
         self.refresh_image_preview()
+        self.set_datum_info(datum)
 
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
@@ -461,6 +484,9 @@ class FkFrame:
         elif isinstance(datum, FkDataset.WorkingImage):
             image_path = datum.image.file_path
             image = load_image_from_disk(image_path)
+
+            datum.set_meta("image_dimensions", (image.width, image.height))
+
             return fit_image_to_canvas(image, target_size)
         else:
             raise ValueError(f"from unexpected datum type: '{type(datum)}'")
@@ -479,9 +505,11 @@ class FkFrame:
         return None if len(treeview_selection) <= 0 else treeview_selection[0]
 
     def __on_menu_item_new_dataset(self):
+        self.set_status("Creating dataset...")
         name, tags = fkdiag.create_new_dataset(self._root)
 
         if name is None:
+            self.set_status(self._last_status)
             return
 
         root_concept = FkVirtualConcept(None, name, tags)
@@ -492,6 +520,24 @@ class FkFrame:
 
         self.open_datum(root_concept.canonical_name)
         self.set_ui_state(tk.NORMAL)
+        self.set_status(f"Dataset '{root_concept.name}' created")
+
+    def __on_menu_item_open_dataset(self):
+        self.set_status("Opening dataset...", True)
+        dataset_directory = tkinter.filedialog.askdirectory(parent=self._root, title="Open Dataset Directory")
+
+        if not dataset_directory:
+            self.set_status(self._last_status)
+            return
+
+        root_concept = fkconcepts.build_concept_tree(dataset_directory)
+        dataset = FkDataset(root_concept)
+
+        self._app.set_working_dataset(dataset)
+        self.refresh_concept_tree()
+
+        self.open_datum(root_concept.canonical_name)
+        self.set_status(f"Opened dataset '{root_concept.name}'", True)
 
     def __on_button_new_concept(self):
         datum_selection = self._current_tree_selection
@@ -503,7 +549,6 @@ class FkFrame:
             return
 
         target_concept = selected_datum.concept
-        print(f"Target concept: {target_concept.canonical_name}")
 
         name, tags = fkdiag.create_new_concept(self._root)
         virtual_concept = FkVirtualConcept(target_concept, name, tags)
@@ -583,11 +628,8 @@ class FkFrame:
                 self.set_status(status)
 
         def on_leave():
-            if "state" in widget_keys:
-                c_state = str(widget.cget("state"))
-                if c_state in [tk.NORMAL, "readonly"]:
-                    self.set_status(self._last_status)
-
+            if self._last_status_temp:
+                self.set_status("Ready")
             else:
                 self.set_status(self._last_status)
 
@@ -627,5 +669,29 @@ def fit_image_to_canvas(image: Image, canvas_size: int) -> Image:
 
     ratio = float(width) / float(height)
     print(width, height, ratio)
+
+    if ratio == 1.0:
+        if width == canvas_size:
+            transparent_canvas.paste(image, box=(0, 0))
+        if width < canvas_size:
+            image = image.resize(size=(canvas_size, canvas_size), resample=PIL.Image.Resampling.LANCZOS)
+            transparent_canvas.paste(image, box=(0, 0))
+    else:
+        if width < height:
+            height_ratio = float(canvas_size / height)
+            target_height = round(height * height_ratio)
+            target_width = round(width * height_ratio)
+        else:
+            width_ratio = float(canvas_size / width)
+            target_width = round(width * width_ratio)
+            target_height = round(height * width_ratio)
+
+        half_size = canvas_size / 2
+
+        x = round(half_size - (target_width / 2))
+        y = round(half_size - (target_height / 2))
+
+        image = image.resize(size=(target_width, target_height))
+        transparent_canvas.paste(image, box=(x, y))
 
     return transparent_canvas

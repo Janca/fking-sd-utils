@@ -25,7 +25,7 @@ class FkConcept:
         self.children.append(child)
 
     def add_image(self, image: FkConceptImage):
-        self.add_image(image)
+        self.images.append(image)
 
     def read_tags(self) -> List[str]:
         return fkutils.read_tags(self.tags_file_path)
@@ -78,9 +78,9 @@ def build_concept_tree(src: str, parent: Optional[FkConcept] = None) -> FkConcep
 
 
 def get_canonical_name(fk: Union[FkConcept, FkConceptImage]) -> str:
-    canonical_name: str = fk.filename if fk is FkConceptImage else fk.directory_name
+    canonical_name: str = fk.filename if isinstance(fk, FkConceptImage) else fk.directory_name
 
-    fkp = fk.concept if fk is FkConceptImage else fk.parent
+    fkp = fk.concept if isinstance(fk, FkConceptImage) else fk.parent
     while fkp is not None:
         canonical_name = f"{fkp.directory_name}.{canonical_name}"
         fkp = fkp.parent

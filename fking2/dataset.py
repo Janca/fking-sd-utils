@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os.path
 from functools import cmp_to_key
-from typing import Tuple, TypeAlias, Union
+from typing import Tuple, TypeAlias, TypeVar, Union
 
 import fking2.utils as fkutils
 from fking2.concepts import FkConcept, FkConceptImage
 
 CaptionList: TypeAlias = list[str]
+T = TypeVar("T")
 
 
 class FkDataset:
@@ -134,7 +135,11 @@ class FkDataset:
             self._concept = concept.concept
             self._working_concept = concept
 
-            basename = os.path.basename(image)
+            str_image = image
+            if isinstance(image, FkConceptImage):
+                str_image = image.file_path
+
+            basename = os.path.basename(str_image)
 
             self._canonical_name = f"{concept.canonical_name}.{basename}"
             self._modified = False
@@ -143,6 +148,7 @@ class FkDataset:
 
             self._original_tags = image.read_tags()
             self._tags = self._original_tags[:]
+            self._meta = {}
 
             super().__init__(dataset)
 
@@ -153,6 +159,14 @@ class FkDataset:
         @property
         def image(self) -> Union[FkConceptImage | str]:
             return self._image
+
+        def set_meta(self, key: str, v: T) -> T:
+            previous_val = self.get_meta(key)
+            self._meta[key] = v
+            return previous_val
+
+        def get_meta(self, key) -> T:
+            return None if key not in self._meta else self._meta[key]
 
     _directory_path: str
     _working_set: [dict, IWorkingDatum]
@@ -239,6 +253,6 @@ def build_working_set(dataset: FkDataset, root: FkDataset.WorkingConcept) -> dic
         working_set.update(child_set)
 
     for image in root.concept.images:
-        working_set[image.canonical_name] = FkDataset.WorkingImage(root, image)
+        working_set[image.canonical_name] = FkDataset.WorkingImage(dataset, root, image)
 
     return working_set
