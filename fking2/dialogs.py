@@ -28,10 +28,10 @@ class _NewDatasetDialog(simpledialog.Dialog):
     root_tags: Optional[list[str]] = None
     _working_directory: Optional[str] = None
 
-    def body(self, master):
+    def body(self, master: tk.Frame):
         self.resizable(False, False)
 
-        img_ico = fkutils.find_image("icon.ico")
+        img_ico = fkutils.find_image_resource("icon.ico")
         self.iconbitmap(img_ico)
         self.title(f"fking captioner v{fkapp.version} - Create Dataset")
 
@@ -39,52 +39,52 @@ class _NewDatasetDialog(simpledialog.Dialog):
         self.grid_columnconfigure(1, minsize=24, weight=0)
 
         frame_textfield_dataset_name, self._textfield_dataset_name = fkutils.border_widget(
-            master,
-            lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
+                master,
+                lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
         )
 
         frame_textfield_dataset_working_path, self._textfield_dataset_working_path = fkutils.border_widget(
-            master,
-            lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
+                master,
+                lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
         )
 
         tk.Label(
-            master,
-            text="Dataset Name",
-            anchor=tk.W,
-            justify=tk.LEFT
+                master,
+                text="Dataset Name",
+                anchor=tk.W,
+                justify=tk.LEFT
         ).grid(row=0, column=0, columnspan=2, sticky=tk.W)
 
         frame_textfield_dataset_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
 
-        tk.Label(
-            master,
-            text="Save Directory",
-            anchor=tk.W,
-            justify=tk.LEFT
-        ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0))
+        # tk.Label(
+        #     master,
+        #     text="Save Directory",
+        #     anchor=tk.W,
+        #     justify=tk.LEFT
+        # ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0))
 
-        frame_textfield_dataset_working_path.grid(row=3, column=0, sticky=tk.W)
+        # frame_textfield_dataset_working_path.grid(row=3, column=0, sticky=tk.W)
 
         self._textfield_dataset_working_path.configure(state=tk.DISABLED)
 
-        self._ico_browse = fkutils.get_photo_image("folder.png")
+        self._ico_browse = fkutils.get_photo_image_resource("folder.png")
         self._button_browse_directory = tk.Button(master, command=self.__on_button_browse, height=24, width=24,
                                                   relief="flat",
                                                   overrelief="flat", compound=tk.LEFT, image=self._ico_browse, padx=3)
 
-        self._button_browse_directory.grid(row=3, column=1, padx=(3, 0))
+        # self._button_browse_directory.grid(row=3, column=1, padx=(3, 0))
 
         tk.Label(
-            master,
-            text="Dataset Prompt (Optional)",
-            anchor=tk.W,
-            justify=tk.LEFT
+                master,
+                text="Dataset Prompt (Optional)",
+                anchor=tk.W,
+                justify=tk.LEFT
         ).grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(3, 0))
 
         frame_textfield_dataset_prompt, self._textfield_dataset_prompt = fkutils.border_widget(
-            master,
-            lambda tkf: tk.Text(tkf, width=32, height=4, wrap=tk.WORD, relief=tk.FLAT)
+                master,
+                lambda tkf: tk.Text(tkf, width=32, height=4, wrap=tk.WORD, relief=tk.FLAT)
         )
 
         frame_textfield_dataset_prompt.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW)
@@ -102,19 +102,25 @@ class _NewDatasetDialog(simpledialog.Dialog):
 
         frame.pack(side=tk.RIGHT, padx=6, pady=0)
 
+        def move_focus(target: tk.Misc):
+            target.focus()
+            return "break"
+
+        self._textfield_dataset_name.bind("<Tab>", lambda e: move_focus(self._textfield_dataset_prompt))
+        self._textfield_dataset_prompt.bind("<Tab>", lambda e: move_focus(self._button_ok))
+        self._button_ok.bind("<Tab>", lambda e: move_focus(self._button_cancel))
+        self._button_cancel.bind("<Tab>", lambda e: move_focus(self._textfield_dataset_name))
+
     def __on_ok_button(self):
         textfield_name = self._textfield_dataset_name.get(1.0, tk.END).strip()
         textfield_name_len = len(textfield_name)
 
-        if textfield_name_len > 0 and self._working_directory is None:
-            tkinter.messagebox.showerror(title="Invalid Dataset Directory",
-                                         message="You must set a valid working directory.")
-        elif textfield_name_len <= 0 and self._working_directory is not None:
+        if textfield_name_len <= 0:
             tkinter.messagebox.showerror(title="Invalid Dataset Name",
                                          message="Please input a valid dataset name.")
         else:
             self.name = textfield_name.replace(" ", "_").lower()
-            self.working_directory = self._working_directory.strip()
+            # self.working_directory = self._working_directory.strip()
 
             textfield_tags = self._textfield_dataset_prompt.get(1.0, tk.END).strip().split(',')
             tags = fkutils.normalize_tags(textfield_tags)
@@ -166,7 +172,7 @@ class _NewConceptDialog(simpledialog.Dialog):
     def body(self, master):
         self.resizable(False, False)
 
-        img_ico = fkutils.find_image("icon.ico")
+        img_ico = fkutils.find_image_resource("icon.ico")
         self.iconbitmap(img_ico)
         self.title(f"fking captioner v{fkapp.version} - Create Concept")
 
@@ -175,22 +181,22 @@ class _NewConceptDialog(simpledialog.Dialog):
         self.grid_columnconfigure(1, weight=0)
 
         frame_textfield_concept_name, self._textfield_concept_name = fkutils.border_widget(
-            master,
-            lambda tkf: tk.Text(tkf, height=1, width=48)
+                master,
+                lambda tkf: tk.Text(tkf, height=1, width=48)
         )
 
         frame_textfield_concept_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
 
         tk.Label(
-            master,
-            text="Concept Tags",
-            anchor=tk.W,
-            justify=tk.LEFT
+                master,
+                text="Concept Tags",
+                anchor=tk.W,
+                justify=tk.LEFT
         ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0))
 
         frame_textfield_concept_tags, self._textfield_concept_tags = fkutils.border_widget(
-            master,
-            lambda tkf: tk.Text(tkf, height=6, width=48)
+                master,
+                lambda tkf: tk.Text(tkf, height=6, width=48)
         )
 
         self._textfield_concept_tags.insert(tk.END, "__folder__")
@@ -251,13 +257,13 @@ class _ConceptImageDropZoneDialog(simpledialog.Dialog):
         tk.Label(master, text="Concept Name", anchor=tk.W, justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
         self.grid_columnconfigure(0, minsize=196, weight=0)
 
-        img_ico = fkutils.find_image("icon.ico")
+        img_ico = fkutils.find_image_resource("icon.ico")
         self.iconbitmap(img_ico)
         self.title(f"fking captioner v{fkapp.version} - Drop Images")
 
         frame_dnd_zone = tk.Frame(master, background="#a0a0a0", padx=1, pady=1)
 
-        self._drop_ico = fkutils.get_photo_image("drop.png")
+        self._drop_ico = fkutils.get_photo_image_resource("drop.png")
         self._label_dnd_zone = tk.Label(frame_dnd_zone, width=256, height=256, image=self._drop_ico,
                                         text="Drop Image(s)", compound=tk.CENTER)
 
@@ -323,7 +329,7 @@ class _ConceptImageDropZoneDialog(simpledialog.Dialog):
 
 def create_new_dataset(root: tk.Tk):
     ndd = _NewDatasetDialog(root)
-    return ndd.name, ndd.working_directory, ndd.root_tags
+    return ndd.name, ndd.root_tags
 
 
 def create_new_concept(root: tk.Tk):

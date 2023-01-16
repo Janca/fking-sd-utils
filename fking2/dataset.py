@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os.path
 from functools import cmp_to_key
-from typing import TypeAlias, Union
+from typing import Tuple, TypeAlias, Union
 
 import fking2.utils as fkutils
 from fking2.concepts import FkConcept, FkConceptImage
@@ -130,7 +130,7 @@ class FkDataset:
             super().__init__(dataset)
 
     class WorkingImage(IWorkingDatum):
-        def __init__(self, dataset: FkDataset, concept: FkDataset.WorkingConcept, image: Union[FkConceptImage|str]):
+        def __init__(self, dataset: FkDataset, concept: FkDataset.WorkingConcept, image: Union[FkConceptImage | str]):
             self._concept = concept.concept
             self._working_concept = concept
 
@@ -151,7 +151,7 @@ class FkDataset:
             return self._working_concept
 
         @property
-        def image(self) -> Union[FkConceptImage|str]:
+        def image(self) -> Union[FkConceptImage | str]:
             return self._image
 
     _directory_path: str
@@ -159,7 +159,7 @@ class FkDataset:
 
     def __init__(self, root: FkConcept):
         self.root = FkDataset.WorkingConcept(self, root)
-        self._working_set = build_working_set(self.root)
+        self._working_set = build_working_set(self, self.root)
         self._directory_path = root.directory_path
 
     @property
@@ -177,14 +177,20 @@ class FkDataset:
     def get(self, canonical_name) -> FkDataset.IWorkingDatum:
         return self._working_set[canonical_name]
 
-    def get_tags(self, canonical_name) -> tuple[CaptionList, CaptionList]:
-        target_tags = self.get(canonical_name).tags
+    def get_tags(self, canonical_name) -> Tuple[CaptionList, CaptionList]:
+        target = self.get(canonical_name)
+
+        target_tags = target.tags
+        target_tags = fkutils.find_and_replace(target_tags, [["__folder__", target.name.lower()]])
+
         hierarchy = self.get_concept_hierarchy(canonical_name)
 
         hierarchy_tags: CaptionList = []
         for concept in hierarchy:
-            hierarchy_tags.extend(concept.tags)
+            c_tags = fkutils.find_and_replace(concept.tags, [["__folder__", concept.name.lower()]])
+            hierarchy_tags.extend(c_tags)
 
+        hierarchy_tags.reverse()
         return fkutils.normalize_tags(target_tags), \
             fkutils.normalize_tags(hierarchy_tags)
 
@@ -210,6 +216,9 @@ class FkDataset:
 
         return hierarchy
 
+    def refresh(self):
+        self._working_set = build_working_set(self, self.root)
+
     def keys(self) -> list[str]:
         def compare(a: str, b: str) -> int:
             awi = self.get(a)
@@ -221,12 +230,12 @@ class FkDataset:
         return keys
 
 
-def build_working_set(root: FkDataset.WorkingConcept) -> dict[str, FkDataset.IWorkingDatum]:
+def build_working_set(dataset: FkDataset, root: FkDataset.WorkingConcept) -> dict[str, FkDataset.IWorkingDatum]:
     working_set: dict[str, FkDataset.IWorkingDatum] = {root.canonical_name: root}
 
     for concept in root.concept.children:
-        working_concept = FkDataset.WorkingConcept(concept)
-        child_set = build_working_set(working_concept)
+        working_concept = FkDataset.WorkingConcept(dataset, concept)
+        child_set = build_working_set(dataset, working_concept)
         working_set.update(child_set)
 
     for image in root.concept.images:

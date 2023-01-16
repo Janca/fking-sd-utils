@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import fking2.utils as fkutils
 
 
 class FkConcept:
-    def __init__(self, parent: FkConcept | None, directory_path: str):
+    def __init__(self, parent: Union[FkConcept, None], directory_path: str):
         self.parent = parent
-        self.children: list[FkConcept] = []
-        self.images: list[FkConceptImage] = []
+        self.children: List[FkConcept] = []
+        self.images: List[FkConceptImage] = []
 
         self.directory_path = directory_path
         self.tags_file_path = os.path.join(directory_path, "__prompt.txt")
@@ -27,11 +27,21 @@ class FkConcept:
     def add_image(self, image: FkConceptImage):
         self.add_image(image)
 
-    def read_tags(self) -> list[str]:
+    def read_tags(self) -> List[str]:
         return fkutils.read_tags(self.tags_file_path)
 
     def read_special_tags(self):
         pass  # TODO
+
+
+class FkVirtualConcept(FkConcept):
+
+    def __init__(self, parent: Union[FkConcept, None], name: str, tags: List[str]):
+        self._tags = tags
+        super().__init__(parent, name.replace(' ', '_').lower())
+
+    def read_tags(self) -> List[str]:
+        return self._tags[:]
 
 
 class FkConceptImage:
@@ -81,9 +91,9 @@ def get_canonical_name(fk: Union[FkConcept, FkConceptImage]) -> str:
 def get_concept_hierarchy(
         fk: Union[FkConcept, FkConceptImage],
         depth: int = None
-) -> list[Union[FkConcept, FkConceptImage]]:
+) -> List[Union[FkConcept, FkConceptImage]]:
     concept = fk if isinstance(fk, FkConcept) else fk.concept
-    hierarchy: list[FkConcept | FkConceptImage] = [concept]
+    hierarchy: List[FkConcept | FkConceptImage] = [concept]
 
     parent = concept.parent
     while parent is not None:

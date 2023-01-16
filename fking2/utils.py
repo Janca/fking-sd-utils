@@ -1,7 +1,7 @@
 import os
 import sys
 import tkinter as tk
-from typing import Callable, TypeVar, Tuple, Optional
+from typing import Callable, List, Optional, Tuple, TypeVar
 
 from PIL import Image
 
@@ -40,6 +40,22 @@ def write_tags(dst: str, tags: list[str]):
         f.close()
 
 
+def find_and_replace(tags: List[str], replacements: List[List[str]]) -> List[str]:
+    r_tags: List[str] = []
+    for t in tags:
+        replaced = False
+
+        for s, r in replacements:
+            if s in t:
+                replaced = True
+                r_tags.append(t.replace(s, r))
+
+        if not replaced:
+            r_tags.append(t)
+
+    return normalize_tags(r_tags)
+
+
 def is_image(path: str) -> bool:
     if not os.path.isfile(path):
         return False
@@ -48,7 +64,7 @@ def is_image(path: str) -> bool:
     return ext in [".png", ".jpg", ".jpeg"]
 
 
-def find_image(relative_path: str):
+def find_image_resource(relative_path: str):
     target_image = relative_path
     if not hasattr(sys, "frozen"):
         target_image = os.path.join(os.path.dirname(__file__), os.path.normpath(f"ui/{target_image}"))
@@ -57,13 +73,13 @@ def find_image(relative_path: str):
     return target_image
 
 
-def get_photo_image(icon: str):
-    ico = find_image(icon)
+def get_photo_image_resource(icon: str):
+    ico = find_image_resource(icon)
     return tk.PhotoImage(file=ico)
 
 
-def get_image(icon: str):
-    ico = find_image(icon)
+def get_image_resource(icon: str):
+    ico = find_image_resource(icon)
     return Image.open(ico)
 
 
