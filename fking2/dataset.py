@@ -40,7 +40,10 @@ class FkDataset:
 
         @property
         def name(self) -> str:
-            return self._name
+            if isinstance(self, FkDataset.WorkingImage):
+                return self._name
+            else:
+                return 'Global' if self._concept is None or self._concept.parent is None else self._name
 
         @property
         def canonical_name(self) -> str:

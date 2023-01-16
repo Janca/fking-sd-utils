@@ -1,9 +1,10 @@
+import math
 import os.path
 import tkinter as tk
 import tkinter.filedialog
 import tkinter.messagebox
 import tkinter.ttk as ttk
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import PIL
 from PIL import ImageTk
@@ -14,7 +15,7 @@ import fking2.concepts as fkconcepts
 import fking2.dialogs as fkdiag
 import fking2.utils as fkutils
 from fking2.app import FkApp
-from fking2.concepts import FkConcept, FkVirtualConcept
+from fking2.concepts import FkConcept, FkConceptImage, FkVirtualConcept
 from fking2.dataset import FkDataset
 
 
@@ -42,6 +43,12 @@ class FkFrame:
     _values_combobox_preview_size: list[str] = [
         " 512px", " 640px", " 768px"
     ]
+
+    _preview_concept_images_max = {
+        _values_combobox_preview_size[0]: 81,
+        _values_combobox_preview_size[1]: 100,
+        _values_combobox_preview_size[2]: 122,
+    }
 
     _label_image_preview: tk.Label
     _image_transparent_image: Optional[tk.PhotoImage]
@@ -299,7 +306,6 @@ class FkFrame:
             [self._button_tag_editor_next, "Apply tags and go to next datum"],
             [self._button_tag_editor_previous, "Apply tags and go to previous datum"],
             [self._combobox_preview_size, "Set previewer size"],
-            [self._treeview_concepts, "Concept tree"],
 
             [self._menu_file, "File menu"]
         ]
@@ -307,10 +313,8 @@ class FkFrame:
         for widget, status_text in widgets:
             self.__bind_status_text(widget, status_text)
 
-    def set_status(self, status: str, temp=False):
-        if not self._last_status_temp:
-            self._last_status = self._current_status.get()
-        self._last_status_temp = temp
+    def set_status(self, status: str):
+        self._last_status = self._current_status.get()
         self._current_status.set(status)
 
     def set_datum_info(self, datum: FkDataset.IWorkingDatum):
@@ -392,22 +396,28 @@ class FkFrame:
         self._textfield_tags.configure(state=state)
 
     def refresh_concept_tree(self):
+        self.set_status("Refreshing concept tree...")
         dataset = self._dataset
         if dataset is None:
+            self.set_status("Ready")
             return
 
         self._treeview_concepts.delete(*self._treeview_concepts.get_children())
 
         datum_keys = dataset.keys()
 
+        concept_count = 0
+        image_count = 0
+
         for key in datum_keys:
             datum = dataset.get(key)
             parent_concept: Optional[FkConcept] = None
             if isinstance(datum, FkDataset.WorkingConcept):
                 parent_concept = datum.concept.parent
+                concept_count = concept_count + 1
             elif isinstance(datum, FkDataset.WorkingImage):
                 parent_concept = datum.concept
-
+                image_count = image_count + 1
             self._treeview_concepts.insert(
                     '' if parent_concept is None else parent_concept.canonical_name,
                     tk.END,
@@ -417,18 +427,22 @@ class FkFrame:
 
         self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
         self._menu_file.entryconfig("Save Dataset", state=tk.NORMAL)
+        self.set_status(f"Loaded '{concept_count}' concept(s) and '{image_count}' image(s)")
 
     def refresh_image_preview(self):
         if self._active_datum is None:
             self.clear_image_preview()
         else:
+            self.set_status("Loading preview...")
             image = self.load_image(self._active_datum.canonical_name)
             if image is None:
                 return
 
-            self._active_image = image
+            fix_to_top = True if isinstance(self._active_datum, FkDataset.WorkingConcept) else False
+            self._active_image = fit_image_to_canvas(image, self._preferences.image_preview_size, True, fix_to_top)
             self._active_preview_image = ImageTk.PhotoImage(self._active_image)
             self._label_image_preview.configure(image=self._active_preview_image)
+            self.set_status("Ready")
 
     def open_datum(self, canonical_name: str):
         self._treeview_concepts.selection_clear()
@@ -451,7 +465,7 @@ class FkFrame:
         self._active_datum = datum
         tag, parent_tags = dataset.get_tags(datum.canonical_name)
 
-        self.set_concept_tools_ui_state(tk.NORMAL)
+        self.set_ui_state(tk.NORMAL)
         self.set_textfield_tags(tag, parent_tags)
 
         self.refresh_image_preview()
@@ -466,12 +480,12 @@ class FkFrame:
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
         self._label_image_preview.configure(image=self._image_transparent_image)
 
-    def load_image(self, canonical_name: str) -> Union[Image, None]:
+    def load_image(self, canonical_name: str, size: Union[int, None] = None) -> Union[Image, None]:
         datum = self._dataset.get(canonical_name)
         if datum is None:
             return None
 
-        target_size = self._preferences.image_preview_size
+        target_size = self._preferences.image_preview_size if size is None else size
         str_target_size = str(target_size)
 
         if str_target_size in self._image_cache:
@@ -479,17 +493,65 @@ class FkFrame:
                 return self._image_cache[str_target_size][canonical_name]
 
         if isinstance(datum, FkDataset.WorkingConcept):
-            print("This is a concept...TODO later")
-            pass
+            target_size = self._combobox_preview_size.current()
+            target_size = self._values_combobox_preview_size[target_size]
+
+            max_concept_images = self._preview_concept_images_max[target_size]
+            target_size_int = self._preferences.image_preview_size
+
+            concept_grid = self.get_concept_image_grid(datum, max_concept_images, target_size_int)
+
+            if str_target_size not in self._image_cache:
+                self._image_cache[str_target_size] = {}
+
+            # concept_grid = fit_image_to_canvas(concept_grid, target_size_int)
+            self._image_cache[str_target_size][canonical_name] = concept_grid
+
+            return concept_grid
         elif isinstance(datum, FkDataset.WorkingImage):
             image_path = datum.image.file_path
             image = load_image_from_disk(image_path)
 
             datum.set_meta("image_dimensions", (image.width, image.height))
+            if str_target_size not in self._image_cache:
+                self._image_cache[str_target_size] = {}
 
-            return fit_image_to_canvas(image, target_size)
+            image = fit_image_to_canvas(image, target_size)
+            self._image_cache[str_target_size][canonical_name] = image
+            return image
         else:
             raise ValueError(f"from unexpected datum type: '{type(datum)}'")
+
+    def get_concept_image_grid(self, datum: FkDataset.IWorkingDatum, max_concept_images: int, canvas_size: int):
+
+        concepts, concept_images = hierarchy(datum.concept, True)
+        concepts = [c for c in concepts if len(c.images) > 0]
+
+        images_per_concept = max(round(max_concept_images / len(concepts)), 1)
+        selected_images = []
+
+        diff = max_concept_images - images_per_concept
+        if diff > 0:
+            images_per_concept = round(images_per_concept + (diff / len(concepts)))
+
+        try:
+            for c in concepts:
+                c_img_len = len(c.images)
+                for i in range(min(images_per_concept, c_img_len)):
+                    c_image = c.images[i]
+                    c_img_canonical = c_image.canonical_name
+                    image = self.load_image(c_img_canonical, canvas_size)
+                    selected_images.append(image)
+
+                    if len(selected_images) >= max_concept_images:
+                        raise StopIteration
+        except StopIteration:
+            pass
+
+        if len(selected_images) <= 0:
+            return get_transparency_image(canvas_size, canvas_size)
+
+        return image_grid(selected_images, canvas_size)
 
     @property
     def _dataset(self):
@@ -519,11 +581,12 @@ class FkFrame:
         self.refresh_concept_tree()
 
         self.open_datum(root_concept.canonical_name)
+
         self.set_ui_state(tk.NORMAL)
         self.set_status(f"Dataset '{root_concept.name}' created")
 
     def __on_menu_item_open_dataset(self):
-        self.set_status("Opening dataset...", True)
+        self.set_status("Opening dataset...")
         dataset_directory = tkinter.filedialog.askdirectory(parent=self._root, title="Open Dataset Directory")
 
         if not dataset_directory:
@@ -537,7 +600,7 @@ class FkFrame:
         self.refresh_concept_tree()
 
         self.open_datum(root_concept.canonical_name)
-        self.set_status(f"Opened dataset '{root_concept.name}'", True)
+        self.set_status("Ready")
 
     def __on_button_new_concept(self):
         datum_selection = self._current_tree_selection
@@ -630,6 +693,10 @@ class FkFrame:
         def on_leave():
             if self._last_status_temp:
                 self.set_status("Ready")
+            elif "state" in widget_keys:
+                c_state = str(widget.cget("state"))
+                if c_state in [tk.NORMAL, "readonly"]:
+                    self.set_status(self._last_status)
             else:
                 self.set_status(self._last_status)
 
@@ -661,21 +728,29 @@ def load_image_from_disk(src: str) -> Union[Image, None]:
         return None
 
 
-def fit_image_to_canvas(image: Image, canvas_size: int) -> Image:
-    transparent_canvas = get_transparency_image(canvas_size, canvas_size)
+def fit_image_to_canvas(
+        image: Image,
+        canvas_size: int,
+        transparency_background: bool = False,
+        fixed_to_top: bool = False
+) -> Image:
+    transparent_canvas: Image
+    if transparency_background:
+        transparent_canvas = get_transparency_image(canvas_size, canvas_size)
+    else:
+        transparent_canvas = PIL.Image.new("RGBA", size=(canvas_size, canvas_size), color=(0, 0, 0, 0))
 
     width = image.width
     height = image.height
 
     ratio = float(width) / float(height)
-    print(width, height, ratio)
 
     if ratio == 1.0:
         if width == canvas_size:
-            transparent_canvas.paste(image, box=(0, 0))
+            transparent_canvas.paste(image, box=(0, 0), mask=image.convert("RGBA"))
         if width < canvas_size:
             image = image.resize(size=(canvas_size, canvas_size), resample=PIL.Image.Resampling.LANCZOS)
-            transparent_canvas.paste(image, box=(0, 0))
+            transparent_canvas.paste(image, box=(0, 0), mask=image.convert("RGBA"))
     else:
         if width < height:
             height_ratio = float(canvas_size / height)
@@ -689,9 +764,53 @@ def fit_image_to_canvas(image: Image, canvas_size: int) -> Image:
         half_size = canvas_size / 2
 
         x = round(half_size - (target_width / 2))
-        y = round(half_size - (target_height / 2))
+        y = 0 if fixed_to_top else round(half_size - (target_height / 2))
 
         image = image.resize(size=(target_width, target_height))
-        transparent_canvas.paste(image, box=(x, y))
+        transparent_canvas.paste(image, box=(x, y), mask=image.convert("RGBA"))
 
     return transparent_canvas
+
+
+def image_grid(images: List[Image], canvas_size: int) -> Image:
+    images_length = len(images)
+
+    rows = round(math.sqrt(images_length))
+    cols = math.ceil(images_length / rows)
+
+    w = h = canvas_size
+    canvas = PIL.Image.new("RGBA", size=(w * cols, h * rows), color=(0, 0, 0, 0))
+
+    for i, img in enumerate(images):
+        canvas.paste(img, box=(i % cols * w, i // cols * h))
+
+    w, h = canvas.size
+    ratio = h / w
+
+    if ratio != 1.0:
+        if w < h:
+            canvas = canvas.resize(size=(int(canvas_size * ratio), canvas_size), resample=PIL.Image.Resampling.LANCZOS)
+        else:
+            canvas = canvas.resize(size=(canvas_size, int(canvas_size * ratio)), resample=PIL.Image.Resampling.LANCZOS)
+    elif w != canvas_size:
+        canvas = canvas.resize(size=(canvas_size, canvas_size), resample=PIL.Image.Resampling.LANCZOS)
+    else:
+        pass
+
+    return canvas
+
+
+def hierarchy(concept: FkConcept, include_self: bool = False):
+    _concepts: List[FkConcept] = [concept] if include_self else []
+    _concept_images: List[FkConceptImage] = [concept.images] if include_self else []
+
+    for child in concept.children:
+        _concepts.append(child)
+        _concept_images.extend(child.images)
+
+        child_concepts, child_images = hierarchy(child)
+
+        _concepts.extend(child_concepts)
+        _concept_images.extend(child_images)
+
+    return _concepts, _concept_images
