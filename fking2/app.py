@@ -12,6 +12,10 @@ class FkApp:
     def __init__(self, preferences):
         self._preferences = preferences
 
+    def set_working_dataset(self, dataset: FkDataset):
+        self._working_dataset = dataset
+        self._working_directory = dataset.directory_path
+
     @property
     def working_dataset(self) -> FkDataset:
         return self._working_dataset

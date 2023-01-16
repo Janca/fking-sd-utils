@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Optional, Union
 
 import fking2.utils as fkutils
 
@@ -49,7 +50,24 @@ class FkConceptImage:
         return fkutils.read_tags(self.text_file_path)
 
 
-def get_canonical_name(fk: FkConcept | FkConceptImage) -> str:
+def build_concept_tree(src: str, parent: Optional[FkConcept] = None) -> FkConcept:
+    concept = FkConcept(parent, src)
+
+    files = os.listdir(src)
+    for filename in files:
+        file_path = os.path.join(src, filename)
+        if os.path.isdir(file_path):
+            child = build_concept_tree(file_path, concept)
+            concept.add_child(child)
+
+        if os.path.isfile(file_path) and fkutils.is_image(file_path):
+            image = FkConceptImage(concept, file_path)
+            concept.add_image(image)
+
+    return concept
+
+
+def get_canonical_name(fk: Union[FkConcept, FkConceptImage]) -> str:
     canonical_name: str = fk.filename if fk is FkConceptImage else fk.directory_name
 
     fkp = fk.concept if fk is FkConceptImage else fk.parent
@@ -60,7 +78,10 @@ def get_canonical_name(fk: FkConcept | FkConceptImage) -> str:
     return canonical_name
 
 
-def get_concept_hierarchy(fk: FkConcept | FkConceptImage, depth: int = None) -> list[FkConcept | FkConceptImage]:
+def get_concept_hierarchy(
+        fk: Union[FkConcept, FkConceptImage],
+        depth: int = None
+) -> list[Union[FkConcept, FkConceptImage]]:
     concept = fk if isinstance(fk, FkConcept) else fk.concept
     hierarchy: list[FkConcept | FkConceptImage] = [concept]
 

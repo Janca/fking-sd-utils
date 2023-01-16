@@ -1,7 +1,7 @@
 import os
 import sys
 import tkinter as tk
-from typing import Callable, TypeVar
+from typing import Callable, TypeVar, Tuple, Optional
 
 from PIL import Image
 
@@ -32,6 +32,12 @@ def read_tags(src: str) -> list[str]:
         tags.extend(line.split(','))
 
     return normalize_tags(tags)
+
+
+def write_tags(dst: str, tags: list[str]):
+    with open(dst, "w+") as f:
+        f.write(", ".join(tags))
+        f.close()
 
 
 def is_image(path: str) -> bool:
@@ -67,7 +73,7 @@ def border_widget(
         color: str = "#a0a0a0",
         thickness: int = 1,
         focus_color: str = "#0078d4"
-) -> tuple[tk.Frame, T]:
+) -> Tuple[tk.Frame, T]:
     f = tk.Frame(root, background=color, borderwidth=thickness)
 
     widget = fk(f)
@@ -85,3 +91,11 @@ def border_widget(
     widget.bind("<FocusOut>", lambda e: f.configure(background=color))
 
     return f, widget
+
+
+def is_int(x: any) -> Tuple[bool, Optional[int]]:
+    try:
+        i = int(x)
+        return True, i
+    except ValueError:
+        return False, None

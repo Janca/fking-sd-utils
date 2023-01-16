@@ -25,6 +25,7 @@ class _NewDatasetDialog(simpledialog.Dialog):
 
     name: Optional[str] = None
     working_directory: Optional[str] = None
+    root_tags: Optional[list[str]] = None
     _working_directory: Optional[str] = None
 
     def body(self, master):
@@ -38,29 +39,29 @@ class _NewDatasetDialog(simpledialog.Dialog):
         self.grid_columnconfigure(1, minsize=24, weight=0)
 
         frame_textfield_dataset_name, self._textfield_dataset_name = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
+            master,
+            lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
         )
 
         frame_textfield_dataset_working_path, self._textfield_dataset_working_path = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
+            master,
+            lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
         )
 
         tk.Label(
-                master,
-                text="Dataset Name",
-                anchor=tk.W,
-                justify=tk.LEFT
+            master,
+            text="Dataset Name",
+            anchor=tk.W,
+            justify=tk.LEFT
         ).grid(row=0, column=0, columnspan=2, sticky=tk.W)
 
         frame_textfield_dataset_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
 
         tk.Label(
-                master,
-                text="Dataset Directory",
-                anchor=tk.W,
-                justify=tk.LEFT
+            master,
+            text="Save Directory",
+            anchor=tk.W,
+            justify=tk.LEFT
         ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0))
 
         frame_textfield_dataset_working_path.grid(row=3, column=0, sticky=tk.W)
@@ -75,15 +76,15 @@ class _NewDatasetDialog(simpledialog.Dialog):
         self._button_browse_directory.grid(row=3, column=1, padx=(3, 0))
 
         tk.Label(
-                master,
-                text="Dataset Prompt (Optional)",
-                anchor=tk.W,
-                justify=tk.LEFT
+            master,
+            text="Dataset Prompt (Optional)",
+            anchor=tk.W,
+            justify=tk.LEFT
         ).grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(3, 0))
 
         frame_textfield_dataset_prompt, self._textfield_dataset_prompt = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, width=32, height=4, wrap=tk.WORD, relief=tk.FLAT)
+            master,
+            lambda tkf: tk.Text(tkf, width=32, height=4, wrap=tk.WORD, relief=tk.FLAT)
         )
 
         frame_textfield_dataset_prompt.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW)
@@ -105,8 +106,6 @@ class _NewDatasetDialog(simpledialog.Dialog):
         textfield_name = self._textfield_dataset_name.get(1.0, tk.END).strip()
         textfield_name_len = len(textfield_name)
 
-        print(textfield_name, textfield_name_len)
-
         if textfield_name_len > 0 and self._working_directory is None:
             tkinter.messagebox.showerror(title="Invalid Dataset Directory",
                                          message="You must set a valid working directory.")
@@ -114,17 +113,20 @@ class _NewDatasetDialog(simpledialog.Dialog):
             tkinter.messagebox.showerror(title="Invalid Dataset Name",
                                          message="Please input a valid dataset name.")
         else:
-            return
+            self.name = textfield_name.replace(" ", "_").lower()
+            self.working_directory = self._working_directory.strip()
 
-        self.name = textfield_name
-        self.working_directory = self._working_directory.strip()
+            textfield_tags = self._textfield_dataset_prompt.get(1.0, tk.END).strip().split(',')
+            tags = fkutils.normalize_tags(textfield_tags)
+            self.root_tags = tags
 
-        self.destroy()
+            self.destroy()
 
     def __on_cancel_button(self):
         self.name = None
         self.working_directory = None
         self._working_directory = None
+        self.root_tags = None
 
         self.destroy()
 
@@ -142,6 +144,13 @@ class _NewDatasetDialog(simpledialog.Dialog):
         self._textfield_dataset_working_path.configure(state=tk.DISABLED)
 
         self._working_directory = abs_directory
+        if len(os.listdir(abs_directory)) > 0:
+            return
+
+        textfield_name = self._textfield_dataset_name.get(1.0, tk.END).strip()
+        if len(textfield_name) <= 0:
+            directory_name = os.path.basename(abs_directory)
+            self._textfield_dataset_name.insert(tk.END, directory_name)
 
 
 class _NewConceptDialog(simpledialog.Dialog):
@@ -166,22 +175,22 @@ class _NewConceptDialog(simpledialog.Dialog):
         self.grid_columnconfigure(1, weight=0)
 
         frame_textfield_concept_name, self._textfield_concept_name = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, height=1, width=48)
+            master,
+            lambda tkf: tk.Text(tkf, height=1, width=48)
         )
 
         frame_textfield_concept_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
 
         tk.Label(
-                master,
-                text="Concept Tags",
-                anchor=tk.W,
-                justify=tk.LEFT
+            master,
+            text="Concept Tags",
+            anchor=tk.W,
+            justify=tk.LEFT
         ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0))
 
         frame_textfield_concept_tags, self._textfield_concept_tags = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, height=6, width=48)
+            master,
+            lambda tkf: tk.Text(tkf, height=6, width=48)
         )
 
         self._textfield_concept_tags.insert(tk.END, "__folder__")
@@ -314,7 +323,7 @@ class _ConceptImageDropZoneDialog(simpledialog.Dialog):
 
 def create_new_dataset(root: tk.Tk):
     ndd = _NewDatasetDialog(root)
-    return ndd.name, ndd.working_directory
+    return ndd.name, ndd.working_directory, ndd.root_tags
 
 
 def create_new_concept(root: tk.Tk):

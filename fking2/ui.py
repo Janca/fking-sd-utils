@@ -1,3 +1,4 @@
+import os
 import tkinter as tk
 import tkinter.messagebox
 import tkinter.ttk as ttk
@@ -6,9 +7,11 @@ from typing import Optional
 from PIL import Image, ImageTk
 
 import fking2.app as fkapp
+import fking2.concepts as fkconcepts
 import fking2.dialogs as fkdiag
 import fking2.utils as fkutils
 from fking2.app import FkApp
+from fking2.concepts import FkConcept
 from fking2.dataset import FkDataset
 
 
@@ -168,14 +171,14 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
-                focus_color="#a0a0a0"
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+            focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -217,10 +220,10 @@ class FkFrame:
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
-                frame_preview_size,
-                width=6,
-                values=self._values_combobox_preview_size,
-                justify=tk.CENTER
+            frame_preview_size,
+            width=6,
+            values=self._values_combobox_preview_size,
+            justify=tk.CENTER
         )
 
         self._combobox_preview_size.current(0)
@@ -281,21 +284,71 @@ class FkFrame:
 
         self._textfield_tags.configure(state=state)
 
+    def refresh_concept_tree(self):
+        dataset = self._dataset
+        if dataset is None:
+            return
+
+        self._treeview_concepts.delete(*self._treeview_concepts.get_children())
+
+        datum_keys = dataset.keys()
+        print(datum_keys)
+
+        for key in datum_keys:
+            datum = dataset.get(key)
+            parent_concept: Optional[FkConcept] = None
+            if isinstance(datum, FkDataset.WorkingConcept):
+                parent_concept = datum.concept.parent
+            elif isinstance(datum, FkDataset.WorkingImage):
+                parent_concept = datum.concept
+
+            self._treeview_concepts.insert(
+                '' if parent_concept is None else parent_concept.canonical_name,
+                tk.END,
+                datum.canonical_name,
+                text=datum.name.replace('_', ' ').title()
+            )
+
+        self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
+        self._menu_file.entryconfig("Save Dataset", state=tk.NORMAL)
+
     def refresh_image_preview(self):
         if self._active_datum is None:
             self.clear_image_preview()
 
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
-                self._app.preferences.image_preview_size,
-                self._app.preferences.image_preview_size
+            self._app.preferences.image_preview_size,
+            self._app.preferences.image_preview_size
         )
 
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
         self._label_image_preview.configure(image=self._image_transparent_image)
 
+    @property
+    def _dataset(self):
+        return self._app.working_dataset
+
     def __on_menu_item_new_dataset(self):
-        name, working_directory = fkdiag.create_new_dataset(self._root)
+        name, working_directory, tags = fkdiag.create_new_dataset(self._root)
+
+        if name is None or working_directory is None:
+            return
+
+        dataset_dir = os.path.join(working_directory, name)
+        os.makedirs(dataset_dir, exist_ok=True)
+
+        if tags:
+            tags_file = os.path.join(dataset_dir, "__prompt.txt")
+            fkutils.write_tags(tags_file, tags)
+
+        root_concept = fkconcepts.build_concept_tree(dataset_dir)
+        working_set = FkDataset(root_concept)
+
+        self._app.set_working_dataset(working_set)
+
+        self.refresh_concept_tree()
+        self.set_ui_state(True)
 
     def __on_button_new_concept(self):
         name, tags = fkdiag.create_new_concept(self._root)

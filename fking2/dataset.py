@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TypeAlias
+import os.path
+from functools import cmp_to_key
+from typing import TypeAlias, Union
 
 import fking2.utils as fkutils
 from fking2.concepts import FkConcept, FkConceptImage
@@ -11,6 +13,7 @@ CaptionList: TypeAlias = list[str]
 class FkDataset:
     class IWorkingDatum:
         _modified: bool = False
+        _name: str
 
         _tags: list[str]
         _original_tags: list[str]
@@ -35,6 +38,10 @@ class FkDataset:
             self._tags = tags
 
         @property
+        def name(self) -> str:
+            return self._name
+
+        @property
         def canonical_name(self) -> str:
             return self._canonical_name
 
@@ -50,6 +57,66 @@ class FkDataset:
         def tags(self) -> CaptionList:
             return self._tags[:]
 
+        def compare(self, other: FkDataset.IWorkingDatum) -> int:
+            if self == other:
+                return 0
+
+            canonical_name = self.canonical_name
+            other_canonical_name = other.canonical_name
+
+            if canonical_name == other_canonical_name:
+                return 0
+
+            self_split = canonical_name.split('.')
+            other_split = other_canonical_name.split('.')
+
+            self_split_len = len(self_split)
+            other_split_len = len(other_split)
+
+            if self_split_len < other_split_len:
+                return -1
+            elif self_split_len > other_split_len:
+                return 1
+            else:
+                self_is_image = isinstance(self, FkDataset.WorkingImage)
+                other_is_image = isinstance(other, FkDataset.WorkingImage)
+
+                if self_is_image and not other_is_image:
+                    return 1
+                elif not self_is_image and other_is_image:
+                    return -1
+                else:
+                    s_filename, s_ext = os.path.splitext(self.image.file_path
+                                                         if isinstance(self, FkDataset.WorkingImage)
+                                                         else self.concept.directory_path)
+
+                    o_filename, o_ext = os.path.splitext(other.image.file_path
+                                                         if isinstance(other, FkDataset.WorkingImage)
+                                                         else other.concept.directory_path)
+
+                    if s_ext == o_ext:
+                        self_is_int, self_as_int = fkutils.is_int(s_filename)
+                        other_is_int, other_as_int = fkutils.is_int(o_filename)
+
+                        if s_filename == o_filename:
+                            return 0
+                        elif self_is_int and other_is_int:
+                            if self_as_int == other_as_int:
+                                return 0
+                            elif self_as_int < other_as_int:
+                                return -1
+                            else:
+                                return 1
+                        elif s_filename < o_filename:
+                            return -1
+                        else:
+                            return 1
+
+                    if s_ext < o_ext:
+                        return -1
+                    else:
+                        return 1
+
     class WorkingConcept(IWorkingDatum):
         def __init__(self, dataset: FkDataset, concept: FkConcept):
             self._concept = concept
@@ -62,16 +129,17 @@ class FkDataset:
 
             super().__init__(dataset)
 
-        @property
-        def name(self):
-            return self._name
-
     class WorkingImage(IWorkingDatum):
-        def __init__(self, dataset: FkDataset, concept: FkDataset.WorkingConcept, image: FkConceptImage):
+        def __init__(self, dataset: FkDataset, concept: FkDataset.WorkingConcept, image: Union[FkConceptImage|str]):
             self._concept = concept.concept
             self._working_concept = concept
-            self._canonical_name = image.canonical_name
+
+            basename = os.path.basename(image)
+
+            self._canonical_name = f"{concept.canonical_name}.{basename}"
             self._modified = False
+            self._image = image
+            self._name = basename
 
             self._original_tags = image.read_tags()
             self._tags = self._original_tags[:]
@@ -82,9 +150,17 @@ class FkDataset:
         def working_concept(self):
             return self._working_concept
 
+        @property
+        def image(self) -> Union[FkConceptImage|str]:
+            return self._image
+
+    _directory_path: str
+    _working_set: [dict, IWorkingDatum]
+
     def __init__(self, root: FkConcept):
         self.root = FkDataset.WorkingConcept(self, root)
         self._working_set = build_working_set(self.root)
+        self._directory_path = root.directory_path
 
     @property
     def modified(self) -> bool:
@@ -93,6 +169,10 @@ class FkDataset:
                 return True
 
         return False
+
+    @property
+    def directory_path(self):
+        return self._directory_path
 
     def get(self, canonical_name) -> FkDataset.IWorkingDatum:
         return self._working_set[canonical_name]
@@ -129,6 +209,16 @@ class FkDataset:
                 raise ValueError
 
         return hierarchy
+
+    def keys(self) -> list[str]:
+        def compare(a: str, b: str) -> int:
+            awi = self.get(a)
+            bwi = self.get(b)
+            return awi.compare(bwi)
+
+        keys = list(self._working_set.keys())
+        keys.sort(key=cmp_to_key(compare))
+        return keys
 
 
 def build_working_set(root: FkDataset.WorkingConcept) -> dict[str, FkDataset.IWorkingDatum]:
