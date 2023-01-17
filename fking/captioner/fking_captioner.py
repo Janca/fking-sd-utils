@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+import tkinter
 import tkinter as tk
 from functools import cmp_to_key
 from tkinter import filedialog, messagebox, ttk
@@ -14,13 +15,16 @@ from fking.fking_utils import is_image, normalize_tags
 
 root = tk.Tk()
 
-ico_img = "icon.ico"
-if not hasattr(sys, "frozen"):
-    ico_img = os.path.join(os.path.dirname(__file__), ico_img)
-else:
-    ico_img = os.path.join(sys.prefix, ico_img)
+try:
+    ico_img = "icon.ico"
+    if not hasattr(sys, "frozen"):
+        ico_img = os.path.join(os.path.dirname(__file__), ico_img)
+    else:
+        ico_img = os.path.join(sys.prefix, ico_img)
 
-root.iconbitmap(ico_img)
+    root.iconbitmap(ico_img)
+except tkinter.TclError:
+    pass # TODO figure out linux stuff
 
 root.resizable(False, False)
 root.option_add('*tearOff', False)
