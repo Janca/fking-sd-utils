@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os.path
+import re
 from functools import cmp_to_key
 from typing import Tuple, TypeAlias, TypeVar, Union
 
@@ -60,66 +61,6 @@ class FkDataset:
         @property
         def tags(self) -> CaptionList:
             return self._tags[:]
-
-        def compare(self, other: FkDataset.IWorkingDatum) -> int:
-            if self == other:
-                return 0
-
-            canonical_name = self.canonical_name
-            other_canonical_name = other.canonical_name
-
-            if canonical_name == other_canonical_name:
-                return 0
-
-            self_split = canonical_name.split('.')
-            other_split = other_canonical_name.split('.')
-
-            self_split_len = len(self_split)
-            other_split_len = len(other_split)
-
-            if self_split_len < other_split_len:
-                return -1
-            elif self_split_len > other_split_len:
-                return 1
-            else:
-                self_is_image = isinstance(self, FkDataset.WorkingImage)
-                other_is_image = isinstance(other, FkDataset.WorkingImage)
-
-                if self_is_image and not other_is_image:
-                    return 1
-                elif not self_is_image and other_is_image:
-                    return -1
-                else:
-                    s_filename, s_ext = os.path.splitext(self.image.file_path
-                                                         if isinstance(self, FkDataset.WorkingImage)
-                                                         else self.concept.directory_path)
-
-                    o_filename, o_ext = os.path.splitext(other.image.file_path
-                                                         if isinstance(other, FkDataset.WorkingImage)
-                                                         else other.concept.directory_path)
-
-                    if s_ext == o_ext:
-                        self_is_int, self_as_int = fkutils.is_int(s_filename)
-                        other_is_int, other_as_int = fkutils.is_int(o_filename)
-
-                        if s_filename == o_filename:
-                            return 0
-                        elif self_is_int and other_is_int:
-                            if self_as_int == other_as_int:
-                                return 0
-                            elif self_as_int < other_as_int:
-                                return -1
-                            else:
-                                return 1
-                        elif s_filename < o_filename:
-                            return -1
-                        else:
-                            return 1
-
-                    if s_ext < o_ext:
-                        return -1
-                    else:
-                        return 1
 
     class WorkingConcept(IWorkingDatum):
         def __init__(self, dataset: FkDataset, concept: FkConcept):
@@ -237,14 +178,17 @@ class FkDataset:
         self._working_set = build_working_set(self, self.root)
 
     def keys(self) -> list[str]:
-        def compare(a: str, b: str) -> int:
-            awi = self.get(a)
-            bwi = self.get(b)
-            return awi.compare(bwi)
+        def sort_dotted_notation(strings):
+            def extract_parts(string):
+                parts = string.split(".")
+                parts = [str(x) if x.isnumeric() else x for x in parts]
+                parts.sort(key=lambda x: (isinstance(x, str), x))
+                return len(parts), parts
+
+            return sorted(strings, key=lambda x: (extract_parts(x), x))
 
         keys = list(self._working_set.keys())
-        keys.sort(key=cmp_to_key(compare))
-        return keys
+        return sort_dotted_notation(keys)
 
 
 def build_working_set(dataset: FkDataset, root: FkDataset.WorkingConcept) -> dict[str, FkDataset.IWorkingDatum]:

@@ -208,14 +208,14 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
-            frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
-            focus_color="#a0a0a0"
+                frame_tag_editor,
+                lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+                focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
-            frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+                frame_tag_editor,
+                lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -257,10 +257,10 @@ class FkFrame:
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
-            frame_preview_size,
-            width=6,
-            values=self._values_combobox_preview_size,
-            justify=tk.CENTER
+                frame_preview_size,
+                width=6,
+                values=self._values_combobox_preview_size,
+                justify=tk.CENTER
         )
 
         preview_size_index = self._values_combobox_preview_size.index(self._previous_preview_size)
@@ -420,10 +420,10 @@ class FkFrame:
                 parent_concept = datum.concept
                 image_count = image_count + 1
             self._treeview_concepts.insert(
-                '' if parent_concept is None else parent_concept.canonical_name,
-                tk.END,
-                datum.canonical_name,
-                text=datum.name
+                    '' if parent_concept is None else parent_concept.canonical_name,
+                    tk.END,
+                    datum.canonical_name,
+                    text=datum.name
             )
 
         self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
@@ -483,8 +483,8 @@ class FkFrame:
 
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
-            self._app.preferences.image_preview_size,
-            self._app.preferences.image_preview_size
+                self._app.preferences.image_preview_size,
+                self._app.preferences.image_preview_size
         )
 
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
@@ -531,6 +531,33 @@ class FkFrame:
         else:
             raise ValueError(f"from unexpected datum type: '{type(datum)}'")
 
+    def get_concept_image_grid_2(self, datum: FkDataset.WorkingConcept, max_concept_images: int,
+                                 size: Union[int, None]):
+        size = self._app.preferences.image_preview_size if size is None else size
+        files = {}
+
+        for child in datum.concept.children:
+            canonical = child.canonical_name
+            if canonical not in files:
+                files[canonical] = []
+
+            files[canonical].extend(child.images)
+
+        if len(files) <= 0:
+            return get_transparency_image(size, size)
+
+        images = []
+        y = max_concept_images // len(files) + (max_concept_images % len(files) != 0)
+        for concept, images in files.items():
+            s_images = images[:y]
+            images.extend(s_images)
+
+        if len(images) <= 0:
+            return get_transparency_image(size, size)
+
+        images = [self.load_image(img.canonical_name, size) for img in images]
+        return image_grid(images, size)
+
     def get_concept_image_grid(self, datum: FkDataset.IWorkingDatum, max_concept_images: int, canvas_size: int):
 
         concepts, concept_images = hierarchy(datum.concept, True)
@@ -545,7 +572,7 @@ class FkFrame:
 
         diff = max_concept_images - images_per_concept
         if diff > 0:
-            images_per_concept = round(images_per_concept + (diff / concept_len))
+            images_per_concept = round(images_per_concept)
 
         try:
             for c in concepts:
@@ -613,7 +640,7 @@ class FkFrame:
             :type pbd fking2.dialogs._ProgressDialog
             :return:
             """
-            pbd.update_progressbar("Opening dataset", -1, -1)
+            pbd.update_progressbar("Opening dataset...")
             root_concept = fkconcepts.build_concept_tree(dataset_directory)
             dataset = FkDataset(root_concept)
 
@@ -783,40 +810,31 @@ def fit_image_to_canvas(
         transparency_background: bool = False,
         fixed_to_top: bool = False
 ) -> Image:
-    transparent_canvas: Image
-    if transparency_background:
-        transparent_canvas = get_transparency_image(canvas_size, canvas_size)
-    else:
-        transparent_canvas = PIL.Image.new("RGBA", size=(canvas_size, canvas_size), color=(0, 0, 0, 0))
+    transparent_canvas: Image = get_transparency_image(canvas_size, canvas_size) if transparency_background \
+        else PIL.Image.new("RGBA", size=(canvas_size, canvas_size), color=(0, 0, 0, 0))
 
-    width = image.width
-    height = image.height
+    width, height = image.size
+    ratio = width / height
 
-    ratio = float(width) / float(height)
-
-    if ratio == 1.0:
-        if width == canvas_size:
-            transparent_canvas.paste(image, box=(0, 0), mask=image.convert("RGBA"))
-        if width < canvas_size:
-            image = image.resize(size=(canvas_size, canvas_size), resample=PIL.Image.Resampling.LANCZOS)
-            transparent_canvas.paste(image, box=(0, 0), mask=image.convert("RGBA"))
-    else:
-        if width < height:
-            height_ratio = float(canvas_size / height)
-            target_height = round(height * height_ratio)
-            target_width = round(width * height_ratio)
+    if ratio != 1.0:
+        if ratio > 1:
+            width = canvas_size
+            height = canvas_size / ratio
         else:
-            width_ratio = float(canvas_size / width)
-            target_width = round(width * width_ratio)
-            target_height = round(height * width_ratio)
+            width = canvas_size * ratio
+            height = canvas_size
 
-        half_size = canvas_size / 2
+        image = image.resize(size=(int(width), int(height)), resample=PIL.Image.Resampling.LANCZOS)
+    elif width != canvas_size:
+        image = image.resize(size=(canvas_size, canvas_size), resample=PIL.Image.Resampling.LANCZOS)
 
-        x = round(half_size - (target_width / 2))
-        y = 0 if fixed_to_top else round(half_size - (target_height / 2))
+    width, height = image.size
 
-        image = image.resize(size=(target_width, target_height))
-        transparent_canvas.paste(image, box=(x, y), mask=image.convert("RGBA"))
+    x = (canvas_size / 2) - (width / 2)
+    y = 0 if fixed_to_top else (canvas_size / 2) - (height / 2)
+
+    mask = image if image.mode == transparent_canvas.mode else image.convert(transparent_canvas.mode)
+    transparent_canvas.paste(image, box=(int(x), int(y)), mask=mask)
 
     return transparent_canvas
 
@@ -833,20 +851,7 @@ def image_grid(images: List[Image], canvas_size: int) -> Image:
     for i, img in enumerate(images):
         canvas.paste(img, box=(i % cols * w, i // cols * h))
 
-    w, h = canvas.size
-    ratio = h / w
-
-    if ratio != 1.0:
-        if w < h:
-            canvas = canvas.resize(size=(int(canvas_size * ratio), canvas_size), resample=PIL.Image.Resampling.LANCZOS)
-        else:
-            canvas = canvas.resize(size=(canvas_size, int(canvas_size * ratio)), resample=PIL.Image.Resampling.LANCZOS)
-    elif w != canvas_size:
-        canvas = canvas.resize(size=(canvas_size, canvas_size), resample=PIL.Image.Resampling.LANCZOS)
-    else:
-        pass
-
-    return canvas
+    return fit_image_to_canvas(canvas, canvas_size, False, True)
 
 
 def hierarchy(concept: FkConcept, include_self: bool = False):
