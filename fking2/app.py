@@ -1,3 +1,5 @@
+from typing import Union
+
 from fking2.dataset import FkDataset
 from fking2.preferences import FkPreferences
 
@@ -12,9 +14,9 @@ class FkApp:
     def __init__(self, preferences):
         self._preferences = preferences
 
-    def set_working_dataset(self, dataset: FkDataset):
+    def set_working_dataset(self, dataset: Union[FkDataset, None]):
         self._working_dataset = dataset
-        self._working_directory = dataset.directory_path
+        self._working_directory = None if dataset is None else dataset.directory_path
 
     @property
     def working_dataset(self) -> FkDataset:

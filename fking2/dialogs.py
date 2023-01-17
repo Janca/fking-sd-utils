@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import os.path
+import threading
 import tkinter as tk
 import tkinter.filedialog
 import tkinter.messagebox
+import tkinter.ttk as ttk
 from tkinter import simpledialog
-from typing import Optional
+from typing import Optional, Union, Callable
 
 import tkinterdnd2
 
@@ -39,20 +43,20 @@ class _NewDatasetDialog(simpledialog.Dialog):
         self.grid_columnconfigure(1, minsize=24, weight=0)
 
         frame_textfield_dataset_name, self._textfield_dataset_name = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
+            master,
+            lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
         )
 
         frame_textfield_dataset_working_path, self._textfield_dataset_working_path = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
+            master,
+            lambda tkf: tk.Text(tkf, width=32, height=1, relief=tk.FLAT, wrap=tk.NONE)
         )
 
         tk.Label(
-                master,
-                text="Dataset Name",
-                anchor=tk.W,
-                justify=tk.LEFT
+            master,
+            text="Dataset Name",
+            anchor=tk.W,
+            justify=tk.LEFT
         ).grid(row=0, column=0, columnspan=2, sticky=tk.W)
 
         frame_textfield_dataset_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
@@ -76,15 +80,15 @@ class _NewDatasetDialog(simpledialog.Dialog):
         # self._button_browse_directory.grid(row=3, column=1, padx=(3, 0))
 
         tk.Label(
-                master,
-                text="Dataset Prompt (Optional)",
-                anchor=tk.W,
-                justify=tk.LEFT
+            master,
+            text="Dataset Prompt (Optional)",
+            anchor=tk.W,
+            justify=tk.LEFT
         ).grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(3, 0))
 
         frame_textfield_dataset_prompt, self._textfield_dataset_prompt = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, width=32, height=4, wrap=tk.WORD, relief=tk.FLAT)
+            master,
+            lambda tkf: tk.Text(tkf, width=32, height=4, wrap=tk.WORD, relief=tk.FLAT)
         )
 
         frame_textfield_dataset_prompt.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW)
@@ -181,22 +185,22 @@ class _NewConceptDialog(simpledialog.Dialog):
         self.grid_columnconfigure(1, weight=0)
 
         frame_textfield_concept_name, self._textfield_concept_name = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, height=1, width=48)
+            master,
+            lambda tkf: tk.Text(tkf, height=1, width=48)
         )
 
         frame_textfield_concept_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
 
         tk.Label(
-                master,
-                text="Concept Tags",
-                anchor=tk.W,
-                justify=tk.LEFT
+            master,
+            text="Concept Tags",
+            anchor=tk.W,
+            justify=tk.LEFT
         ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0))
 
         frame_textfield_concept_tags, self._textfield_concept_tags = fkutils.border_widget(
-                master,
-                lambda tkf: tk.Text(tkf, height=6, width=48)
+            master,
+            lambda tkf: tk.Text(tkf, height=6, width=48)
         )
 
         self._textfield_concept_tags.insert(tk.END, "__folder__")
@@ -327,6 +331,66 @@ class _ConceptImageDropZoneDialog(simpledialog.Dialog):
         self.destroy()
 
 
+class _ProgressDialog(simpledialog.Dialog):
+    class Task:
+        def __init__(self, p_dialog: _ProgressDialog):
+            self._p_dialog = p_dialog
+
+    _button_ok: tk.Button
+    _button_cancel: tk.Button
+
+    _progressbar: ttk.Progressbar
+    _progress_status_text: tk.StringVar
+    _progress_steps_text: tk.StringVar
+
+    def __init__(self, parent: Union[tk.Misc, None], task: Callable[[_ProgressDialog], None]) -> None:
+        self._task = task
+
+        super().__init__(parent)
+
+    def body(self, master: tk.Frame):
+        self.resizable(False, False)
+        self.overrideredirect(True)
+
+        master.configure(borderwidth=1, relief=tk.FLAT, background="#a0a0a0")
+        frame = tk.Frame(master, borderwidth=16, relief=tk.FLAT)
+        frame.pack()
+
+        self._progress_status_text = tk.StringVar(frame)
+        tk.Label(frame, textvariable=self._progress_status_text,
+                 justify=tk.LEFT, anchor=tk.W).grid(row=0, column=0, sticky=tk.W)
+
+        self._progress_steps_text = tk.StringVar(frame)
+        tk.Label(frame, textvariable=self._progress_steps_text,
+                 justify=tk.RIGHT, anchor=tk.E).grid(row=0, column=1, sticky=tk.E)
+
+        self._progressbar = ttk.Progressbar(frame, orient=tk.HORIZONTAL, length=296, mode="indeterminate")
+        self._progressbar.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW, pady=(3, 0))
+
+        threading.Thread(target=self.next).start()
+
+    def buttonbox(self):
+        pass
+
+    def next(self):
+        self._task(self)
+
+    def update_progressbar(self, message: str, value: int = -1, max_value: int = -1):
+        self._progress_status_text.set(message)
+
+        if max_value > 0:
+            self._progressbar["mode"] = "determinate"
+            self._progressbar["value"] = max(0, value)
+            self._progressbar["maximum"] = max_value
+
+            self._progress_steps_text.set(f"{value}/{max_value}")
+        else:
+            self._progressbar["value"] = 0
+            self._progressbar["maximum"] = 100
+            self._progressbar["mode"] = "indeterminate"
+            self._progressbar.start()
+
+
 def create_new_dataset(root: tk.Tk):
     ndd = _NewDatasetDialog(root)
     return ndd.name, ndd.root_tags
@@ -340,3 +404,7 @@ def create_new_concept(root: tk.Tk):
 def drag_and_drop(root: tk.Tk):
     dnd = _ConceptImageDropZoneDialog(root)
     return dnd.images
+
+
+def show_progress_bar(root: tk.Tk, task: Callable[[_ProgressDialog], None]):
+    _ProgressDialog(root, task)

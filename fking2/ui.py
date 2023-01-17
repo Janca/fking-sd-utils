@@ -208,14 +208,14 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
-                focus_color="#a0a0a0"
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+            focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -257,10 +257,10 @@ class FkFrame:
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
-                frame_preview_size,
-                width=6,
-                values=self._values_combobox_preview_size,
-                justify=tk.CENTER
+            frame_preview_size,
+            width=6,
+            values=self._values_combobox_preview_size,
+            justify=tk.CENTER
         )
 
         preview_size_index = self._values_combobox_preview_size.index(self._previous_preview_size)
@@ -398,11 +398,12 @@ class FkFrame:
     def refresh_concept_tree(self):
         self.set_status("Refreshing concept tree...")
         dataset = self._dataset
+
+        self._treeview_concepts.delete(*self._treeview_concepts.get_children())
+
         if dataset is None:
             self.set_status("Ready")
             return
-
-        self._treeview_concepts.delete(*self._treeview_concepts.get_children())
 
         datum_keys = dataset.keys()
 
@@ -419,10 +420,10 @@ class FkFrame:
                 parent_concept = datum.concept
                 image_count = image_count + 1
             self._treeview_concepts.insert(
-                    '' if parent_concept is None else parent_concept.canonical_name,
-                    tk.END,
-                    datum.canonical_name,
-                    text=datum.name
+                '' if parent_concept is None else parent_concept.canonical_name,
+                tk.END,
+                datum.canonical_name,
+                text=datum.name
             )
 
         self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
@@ -471,10 +472,19 @@ class FkFrame:
         self.refresh_image_preview()
         self.set_datum_info(datum)
 
+    def clear_dataset(self):
+        self._app.set_working_dataset(None)
+        self._image_cache.clear()
+
+        self._active_datum = None
+
+        self.refresh_image_preview()
+        self.refresh_concept_tree()
+
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
-                self._app.preferences.image_preview_size,
-                self._app.preferences.image_preview_size
+            self._app.preferences.image_preview_size,
+            self._app.preferences.image_preview_size
         )
 
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
@@ -506,7 +516,6 @@ class FkFrame:
 
             # concept_grid = fit_image_to_canvas(concept_grid, target_size_int)
             self._image_cache[str_target_size][canonical_name] = concept_grid
-
             return concept_grid
         elif isinstance(datum, FkDataset.WorkingImage):
             image_path = datum.image.file_path
@@ -527,12 +536,16 @@ class FkFrame:
         concepts, concept_images = hierarchy(datum.concept, True)
         concepts = [c for c in concepts if len(c.images) > 0]
 
-        images_per_concept = max(round(max_concept_images / len(concepts)), 1)
+        concept_len = len(concepts)
+        if concept_len <= 0:
+            return get_transparency_image(canvas_size, canvas_size)
+
+        images_per_concept = max(round(max_concept_images / concept_len), 1)
         selected_images = []
 
         diff = max_concept_images - images_per_concept
         if diff > 0:
-            images_per_concept = round(images_per_concept + (diff / len(concepts)))
+            images_per_concept = round(images_per_concept + (diff / concept_len))
 
         try:
             for c in concepts:
@@ -593,14 +606,50 @@ class FkFrame:
             self.set_status(self._last_status)
             return
 
-        root_concept = fkconcepts.build_concept_tree(dataset_directory)
-        dataset = FkDataset(root_concept)
+        self.clear_dataset()
 
-        self._app.set_working_dataset(dataset)
-        self.refresh_concept_tree()
+        def do_open(pbd):
+            """
+            :type pbd fking2.dialogs._ProgressDialog
+            :return:
+            """
+            pbd.update_progressbar("Opening dataset", -1, -1)
+            root_concept = fkconcepts.build_concept_tree(dataset_directory)
+            dataset = FkDataset(root_concept)
 
-        self.open_datum(root_concept.canonical_name)
-        self.set_status("Ready")
+            self._app.set_working_dataset(dataset)
+            self.refresh_concept_tree()
+
+            keys = dataset.keys()
+            total = len(keys)
+            current = 0
+
+            current_preview_size = self._app.preferences.image_preview_size
+
+            concept_keys: List[str] = []
+            for key in keys:
+                datum = dataset.get(key)
+                if isinstance(datum, FkDataset.WorkingConcept):
+                    concept_keys.append(key)
+                else:
+                    pbd.update_progressbar(f"Caching image...", current, total)
+                    self.set_status(f"Caching image '{datum.canonical_name}'...")
+                    self.load_image(datum.canonical_name, current_preview_size)
+                    current = current + 1
+
+            for key in concept_keys:
+                datum = dataset.get(key)
+                pbd.update_progressbar(f"Caching image...", current, total)
+                self.set_status(f"Caching image '{datum.canonical_name}'...")
+                self.load_image(datum.canonical_name, current_preview_size)
+                current = current + 1
+
+            pbd.destroy()
+
+            self.open_datum(root_concept.canonical_name)
+            self.set_status("Ready")
+
+        fkdiag.show_progress_bar(self._root, do_open)
 
     def __on_button_new_concept(self):
         datum_selection = self._current_tree_selection
