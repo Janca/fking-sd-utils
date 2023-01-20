@@ -374,6 +374,7 @@ class _ProgressDialog(simpledialog.Dialog):
     def next(self):
         for task in self._tasks:
             task(self)
+        self.destroy()
 
     def update_progressbar(self, message: str, value: int = -1, max_value: int = -1):
         self._progress_status_text.set(message)

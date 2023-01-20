@@ -51,8 +51,8 @@ class FkConceptImage:
         self.file_path = file_path
         self.filename = os.path.basename(file_path)
 
-        self.text_file_path = os.path.join(self.concept.directory_path, f"{os.path.splitext(self.filename)[0]}.txt")
-        self.text_filename = os.path.basename(self.text_file_path)
+        self.text_filename = f"{os.path.splitext(self.filename)[0]}.txt"
+        self.text_file_path = os.path.join(self.concept.directory_path, self.text_filename)
 
         self.canonical_name = get_canonical_name(self)
 

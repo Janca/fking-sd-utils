@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os.path
-import re
-from functools import cmp_to_key
 from typing import Tuple, TypeAlias, TypeVar, Union
 
 import fking2.utils as fkutils
@@ -177,6 +175,7 @@ class FkDataset:
     def refresh(self):
         self._working_set = build_working_set(self, self.root)
 
+    @property
     def keys(self) -> list[str]:
         def sort_dotted_notation(strings):
             def extract_parts(string):
@@ -189,6 +188,14 @@ class FkDataset:
 
         keys = list(self._working_set.keys())
         return sort_dotted_notation(keys)
+
+    @property
+    def values(self):
+        return list(self._working_set.values())
+
+    @property
+    def images(self):
+        return [f for f in self.values if isinstance(f, FkDataset.WorkingImage)]
 
 
 def build_working_set(dataset: FkDataset, root: FkDataset.WorkingConcept) -> dict[str, FkDataset.IWorkingDatum]:

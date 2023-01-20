@@ -1,5 +1,6 @@
 import math
 import os.path
+import shutil
 import tkinter as tk
 import tkinter.filedialog
 import tkinter.messagebox
@@ -120,7 +121,8 @@ class FkFrame:
         self._menu_file.add_command(label="Save Dataset", underline=True, accelerator="Ctrl+S")
 
         self._menu_file.add_separator()
-        self._menu_file.add_command(label="Flatten Dataset", underline=True, accelerator="Ctrl+L")
+        self._menu_file.add_command(label="Flatten Dataset", command=self.__on_menu_item_flatten_dataset,
+                                    underline=True, accelerator="Ctrl+L")
 
         self._menu_file.entryconfig("Save Dataset", state=tk.DISABLED)
         self._menu_file.entryconfig("Flatten Dataset", state=tk.DISABLED)
@@ -208,14 +210,14 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
-            frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
-            focus_color="#a0a0a0"
+                frame_tag_editor,
+                lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+                focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
-            frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+                frame_tag_editor,
+                lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -257,10 +259,10 @@ class FkFrame:
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
-            frame_preview_size,
-            width=6,
-            values=self._values_combobox_preview_size,
-            justify=tk.CENTER
+                frame_preview_size,
+                width=6,
+                values=self._values_combobox_preview_size,
+                justify=tk.CENTER
         )
 
         preview_size_index = self._values_combobox_preview_size.index(self._previous_preview_size)
@@ -405,7 +407,7 @@ class FkFrame:
             self.set_status("Ready")
             return
 
-        datum_keys = dataset.keys()
+        datum_keys = dataset.keys
 
         concept_count = 0
         image_count = 0
@@ -420,10 +422,10 @@ class FkFrame:
                 parent_concept = datum.concept
                 image_count = image_count + 1
             self._treeview_concepts.insert(
-                '' if parent_concept is None else parent_concept.canonical_name,
-                tk.END,
-                datum.canonical_name,
-                text=datum.name
+                    '' if parent_concept is None else parent_concept.canonical_name,
+                    tk.END,
+                    datum.canonical_name,
+                    text=datum.name
             )
 
         self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
@@ -465,6 +467,8 @@ class FkFrame:
 
         self._active_datum = datum
         tag, parent_tags = dataset.get_tags(datum.canonical_name)
+        print(f"Tags for '{datum.canonical_name}': {', '.join(tag)}")
+        print(f"Parent tags for '{datum.canonical_name}' {', '.join(parent_tags)}'")
 
         self.set_ui_state(tk.NORMAL)
         self.set_textfield_tags(tag, parent_tags)
@@ -483,8 +487,8 @@ class FkFrame:
 
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
-            self._app.preferences.image_preview_size,
-            self._app.preferences.image_preview_size
+                self._app.preferences.image_preview_size,
+                self._app.preferences.image_preview_size
         )
 
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
@@ -593,14 +597,14 @@ class FkFrame:
 
         return image_grid(selected_images, canvas_size)
 
-    def cache_image_set(self, size: int, close: bool = False):
+    def cache_image_set(self, size: int):
         def do_cache(pbd):
             """
             :type pbd fking2.dialogs._ProgressDialog
             :return:
             """
             dataset = self._dataset
-            keys = dataset.keys()
+            keys = dataset.keys
             total = len(keys)
             current = 0
 
@@ -621,9 +625,6 @@ class FkFrame:
                 self.set_status(f"Caching image '{datum.canonical_name}'...")
                 self.load_image(datum.canonical_name, size)
                 current = current + 1
-
-            if close:
-                pbd.destroy()
 
             self.set_status("Ready")
 
@@ -680,9 +681,84 @@ class FkFrame:
             self.refresh_concept_tree()
 
         cache_image_size = self._preferences.image_preview_size
-        do_cache = self.cache_image_set(cache_image_size, True)
+        do_cache = self.cache_image_set(cache_image_size)
         fkdiag.show_progress_bar(self._root, do_open, do_cache)
         self.open_datum(self._dataset.root.canonical_name)
+
+    def __on_menu_item_flatten_dataset(self):
+        dataset = self._dataset
+        if dataset is None:
+            return
+
+        # TODO add option to for saving dataset before flattening
+        self.set_status("Flattening dataset...")
+
+        dst_directory = tkinter.filedialog.askdirectory()
+        if dst_directory is None or len(dst_directory) <= 0:
+            self.set_status("Ready")
+            return
+
+        dataset_directory = os.path.join(dst_directory, "dataset")
+        if os.path.isdir(dataset_directory):
+            if tkinter.messagebox.askyesno(
+                    title="Overwrite Confirmation",
+                    message="Are you sure you want to overwrite the existing directory contents?"
+                            "\nThis action is irreversible."
+            ):
+                shutil.rmtree(dataset_directory)
+            else:
+                tkinter.messagebox.showinfo(
+                        title="Flattening Cancelled",
+                        message="Cancelled flattening operation, no changes were written to disk."
+                )
+
+                self.set_status("Ready")
+                return
+
+        def do_flatten(pbd):
+            """
+            :type pbd fking2.dialogs._ProgressDialog
+            :return:
+            """
+
+            pbd.update_progressbar("Flattening dataset...")
+            os.makedirs(dataset_directory, exist_ok=True)
+
+            pbd.update_progressbar("Flattening dataset...", 0, images_len)
+            for i, image in enumerate(images):
+                self.set_status(f"Flattening '{image.canonical_name}'...")
+                pbd.update_progressbar("Flattening image...", i + 1, images_len)
+                tags, parent_tags = dataset.get_tags(image.canonical_name)
+
+                out_tags = []
+                out_tags.extend(parent_tags)
+                out_tags.extend(tags)
+
+                out_tags = fkutils.normalize_tags(out_tags)
+
+                dst_image = os.path.join(dataset_directory, image.image.filename)
+                dst_tags_file = os.path.join(dataset_directory, image.image.text_filename)
+
+                # print(f"Copying {image.image.file_path} to {dst_image}")
+                shutil.copyfile(image.image.file_path, dst_image)
+
+                if len(out_tags) <= 0:
+                    continue
+
+                fkutils.write_tags(dst_tags_file, out_tags)
+
+        images = dataset.images
+        images_len = len(images)
+        if images_len <= 0:
+            return
+
+        fkdiag.show_progress_bar(self._root, do_flatten)
+        tkinter.messagebox.showinfo(
+                title="Flatten Dataset Complete",
+                message=f"Flattened {images_len,} image(s)."
+        )
+
+        self.set_status("Ready")
 
     def __on_button_new_concept(self):
         datum_selection = self._current_tree_selection
@@ -760,7 +836,7 @@ class FkFrame:
                     if key != str_size:
                         self._image_cache[key].clear()
 
-                do_cache = self.cache_image_set(selected_int_value, True)
+                do_cache = self.cache_image_set(selected_int_value)
                 fkdiag.show_progress_bar(self._root, do_cache)
                 cleared_cache = True
 
