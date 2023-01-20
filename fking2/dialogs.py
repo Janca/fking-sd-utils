@@ -332,10 +332,6 @@ class _ConceptImageDropZoneDialog(simpledialog.Dialog):
 
 
 class _ProgressDialog(simpledialog.Dialog):
-    class Task:
-        def __init__(self, p_dialog: _ProgressDialog):
-            self._p_dialog = p_dialog
-
     _button_ok: tk.Button
     _button_cancel: tk.Button
 
@@ -343,8 +339,10 @@ class _ProgressDialog(simpledialog.Dialog):
     _progress_status_text: tk.StringVar
     _progress_steps_text: tk.StringVar
 
-    def __init__(self, parent: Union[tk.Misc, None], task: Callable[[_ProgressDialog], None]) -> None:
-        self._task = task
+    thread:threading.Thread
+
+    def __init__(self, parent: Union[tk.Misc, None], *args: Callable[[_ProgressDialog], None]) -> None:
+        self._tasks = args
 
         super().__init__(parent)
 
@@ -367,13 +365,15 @@ class _ProgressDialog(simpledialog.Dialog):
         self._progressbar = ttk.Progressbar(frame, orient=tk.HORIZONTAL, length=296, mode="indeterminate")
         self._progressbar.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW, pady=(3, 0))
 
-        threading.Thread(target=self.next).start()
+        self.thread = threading.Thread(target=self.next)
+        self.thread.start()
 
     def buttonbox(self):
         pass
 
     def next(self):
-        self._task(self)
+        for task in self._tasks:
+            task(self)
 
     def update_progressbar(self, message: str, value: int = -1, max_value: int = -1):
         self._progress_status_text.set(message)
@@ -406,5 +406,5 @@ def drag_and_drop(root: tk.Tk):
     return dnd.images
 
 
-def show_progress_bar(root: tk.Tk, task: Callable[[_ProgressDialog], None]):
-    _ProgressDialog(root, task)
+def show_progress_bar(root: tk.Tk, *args: Callable[[_ProgressDialog], None]):
+    _ProgressDialog(root, *args)
