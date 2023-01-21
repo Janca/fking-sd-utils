@@ -61,24 +61,6 @@ class _NewDatasetDialog(simpledialog.Dialog):
 
         frame_textfield_dataset_name.grid(row=1, column=0, columnspan=2, sticky=tk.NSEW)
 
-        # tk.Label(
-        #     master,
-        #     text="Save Directory",
-        #     anchor=tk.W,
-        #     justify=tk.LEFT
-        # ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(6, 0))
-
-        # frame_textfield_dataset_working_path.grid(row=3, column=0, sticky=tk.W)
-
-        self._textfield_dataset_working_path.configure(state=tk.DISABLED)
-
-        self._ico_browse = fkutils.get_photo_image_resource("folder.png")
-        self._button_browse_directory = tk.Button(master, command=self.__on_button_browse, height=24, width=24,
-                                                  relief="flat",
-                                                  overrelief="flat", compound=tk.LEFT, image=self._ico_browse, padx=3)
-
-        # self._button_browse_directory.grid(row=3, column=1, padx=(3, 0))
-
         tk.Label(
             master,
             text="Dataset Prompt (Optional)",
@@ -106,14 +88,19 @@ class _NewDatasetDialog(simpledialog.Dialog):
 
         frame.pack(side=tk.RIGHT, padx=6, pady=0)
 
-        def move_focus(target: tk.Misc):
-            target.focus()
-            return "break"
+        fkutils.setup_tab_focus(
+            self._textfield_dataset_name,
+            self._textfield_dataset_prompt,
+            self._button_ok,
+            self._button_cancel
+        )
 
-        self._textfield_dataset_name.bind("<Tab>", lambda e: move_focus(self._textfield_dataset_prompt))
-        self._textfield_dataset_prompt.bind("<Tab>", lambda e: move_focus(self._button_ok))
-        self._button_ok.bind("<Tab>", lambda e: move_focus(self._button_cancel))
-        self._button_cancel.bind("<Tab>", lambda e: move_focus(self._textfield_dataset_name))
+        fkutils.setup_bind(
+            "<Return>", self.__on_ok_button, True,
+            self._textfield_dataset_name,
+            self._textfield_dataset_prompt,
+            self._button_ok
+        )
 
     def __on_ok_button(self):
         textfield_name = self._textfield_dataset_name.get(1.0, tk.END).strip()
@@ -212,7 +199,6 @@ class _NewConceptDialog(simpledialog.Dialog):
                                                         command=self._textfield_concept_tags.yview)
 
         self._textfield_concept_tags.config(yscrollcommand=scrollbar_textfield_concept_tags.set)
-
         scrollbar_textfield_concept_tags.grid(row=3, column=1, sticky=tk.NSEW)
 
         return self._textfield_concept_name
@@ -227,6 +213,22 @@ class _NewConceptDialog(simpledialog.Dialog):
         self._button_cancel.grid(row=0, column=0, pady=(0, 6))
 
         frame.pack(side=tk.RIGHT, padx=6, pady=0)
+
+        fkutils.setup_tab_focus(
+            self._textfield_concept_name,
+            self._textfield_concept_tags,
+            self._button_ok,
+            self._button_cancel
+        )
+
+        fkutils.setup_bind(
+            "<Return>",
+            self.__on_ok_button,
+            True,
+            self._textfield_concept_name,
+            self._textfield_concept_tags,
+            self._button_ok
+        )
 
     def __on_ok_button(self):
         textfield_name = self._textfield_concept_name.get(1.0, tk.END).strip()
@@ -305,9 +307,9 @@ class _ConceptImageDropZoneDialog(simpledialog.Dialog):
 
         files = self.tk.splitlist(event.data)
         for file in files:
-            if fkutils.is_image(file):
+            if os.path.isfile(file) and fkutils.is_image(file):
                 self._images.append(file)
-            else:
+            elif os.path.isdir(file):
                 c_images = find_images(file)
                 self._images.extend(c_images)
 
@@ -373,12 +375,20 @@ class _ProgressDialog(simpledialog.Dialog):
         self.thread = threading.Thread(target=self.next)
         self.thread.start()
 
+        self.monitor()
+
     def buttonbox(self):
         pass
 
     def next(self):
         for task in self._tasks:
             task(self)
+
+    def monitor(self):
+        if self.thread.is_alive():
+            self.after(100, self.monitor)
+            return
+
         self.destroy()
 
     def update_progressbar(self, message: str, value: int = -1, max_value: int = -1):
@@ -388,6 +398,9 @@ class _ProgressDialog(simpledialog.Dialog):
             self._progressbar["mode"] = "determinate"
             self._progressbar["value"] = max(0, value)
             self._progressbar["maximum"] = max_value
+
+            if value >= max_value:
+                self._progressbar.stop()
 
             self._progress_steps_text.set(f"{value:,}/{max_value:,}")
         else:

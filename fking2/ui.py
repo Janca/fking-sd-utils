@@ -1,3 +1,4 @@
+import hashlib
 import math
 import os.path
 import shutil
@@ -118,7 +119,8 @@ class FkFrame:
         self._menu_file.add_command(label="Open Dataset", command=self.__on_menu_item_open_dataset,
                                     underline=True, accelerator="Ctrl+O")
 
-        self._menu_file.add_command(label="Save Dataset", underline=True, accelerator="Ctrl+S")
+        self._menu_file.add_command(label="Save Dataset", command=self.__on_menu_item_save_dataset,
+                                    underline=True, accelerator="Ctrl+S")
 
         self._menu_file.add_separator()
         self._menu_file.add_command(label="Flatten Dataset", command=self.__on_menu_item_flatten_dataset,
@@ -131,9 +133,9 @@ class FkFrame:
         self._menu_file.add_command(label="Quit", command=self.__on_menu_item_exit,
                                     underline=True, accelerator="Ctrl+Q")
 
-        # root.bind_all("<Control-s>", on_menu_item_save)
-        # root.bind_all("<Control-l>", on_menu_item_flatten)
-        # root.bind_all("<Control-o>", on_menu_item_open)
+        self._root.bind_all("<Control-s>", self.__on_menu_item_save_dataset)
+        self._root.bind_all("<Control-l>", self.__on_menu_item_flatten_dataset)
+        self._root.bind_all("<Control-o>", self.__on_menu_item_open_dataset)
         self._root.bind_all("<Control-q>", self.request_exit)
         #
         self._root.protocol("WM_DELETE_WINDOW", self.request_exit)
@@ -475,6 +477,9 @@ class FkFrame:
         self.refresh_image_preview()
         self.set_datum_info(datum)
 
+        self._textfield_tags.focus()
+        # self.set_title(f"'{fragment}'")
+
     def clear_dataset(self):
         self._app.set_working_dataset(None)
         self._image_cache.clear()
@@ -629,7 +634,7 @@ class FkFrame:
 
         return do_cache
 
-    def request_exit(self):
+    def request_exit(self, *args):
         if self._dataset is None or not self._dataset.modified:
             self._root.destroy()
             return
@@ -673,7 +678,7 @@ class FkFrame:
         self.set_ui_state(tk.NORMAL)
         self.set_status(f"Dataset '{root_concept.name}' created")
 
-    def __on_menu_item_open_dataset(self):
+    def __on_menu_item_open_dataset(self, *args):
         self.set_status("Opening dataset...")
         dataset_directory = tkinter.filedialog.askdirectory(parent=self._root, title="Open Dataset Directory")
 
@@ -696,7 +701,7 @@ class FkFrame:
         fkdiag.show_progress_bar(self._root, do_open, do_cache)
         self.open_datum(self._dataset.root.canonical_name)
 
-    def __on_menu_item_flatten_dataset(self):
+    def __on_menu_item_flatten_dataset(self, *args):
         dataset = self._dataset
         if dataset is None:
             return
@@ -704,7 +709,11 @@ class FkFrame:
         # TODO add option to for saving dataset before flattening
         self.set_status("Flattening dataset...")
 
-        dst_directory = tkinter.filedialog.askdirectory()
+        dst_directory = tkinter.filedialog.askdirectory(
+            parent=self._root,
+            title="Select Directory for Output"
+        )
+
         if dst_directory is None or len(dst_directory) <= 0:
             self.set_status("Ready")
             return
@@ -714,7 +723,7 @@ class FkFrame:
             if tkinter.messagebox.askyesno(
                     title="Overwrite Confirmation",
                     message="Are you sure you want to overwrite the existing directory contents?"
-                            "\nThis action is irreversible."
+                            "\n\nThis action is irreversible."
             ):
                 shutil.rmtree(dataset_directory)
             else:
@@ -747,8 +756,11 @@ class FkFrame:
 
                 out_tags = fkutils.normalize_tags(out_tags)
 
-                dst_image = os.path.join(dataset_directory, image.image.filename)
-                dst_tags_file = os.path.join(dataset_directory, image.image.text_filename)
+                u_name = hashlib.sha256(image.canonical_name.encode()).hexdigest()
+                img_ext = os.path.splitext(image.image.filename)[1]
+
+                dst_image = os.path.join(dataset_directory, u_name + img_ext)
+                dst_tags_file = os.path.join(dataset_directory, u_name + ".txt")
 
                 # print(f"Copying {image.image.file_path} to {dst_image}")
                 shutil.copyfile(image.image.file_path, dst_image)
@@ -770,6 +782,74 @@ class FkFrame:
         )
 
         self.set_status("Ready")
+
+    def __on_menu_item_save_dataset(self, *args):
+        if self._dataset is None:
+            return
+
+        if not self._dataset.modified:
+            return
+
+        if self._dataset.virtual:
+            dst_directory = tkinter.filedialog.askdirectory(title="Save Dataset")
+            if dst_directory is None or len(dst_directory) <= 0:
+                return
+        else:
+            dst_directory = self._dataset.directory_path
+
+        self.set_ui_state(tk.DISABLED)
+        dataset = self._dataset
+
+        def do_save(pbd):
+            """
+            :type pbd: fking2.dialogs._ProgressDialog
+            :return:
+            """
+            pbd.update_progressbar("Saving Dataset...")
+
+            datum_keys = dataset.keys
+            length = len(datum_keys)
+
+            pbd.update_progressbar("Saving Dataset...", 0, length)
+
+            for i, datum_key in enumerate(datum_keys):
+                pbd.update_progressbar("Saving Dataset...", i, length)
+                datum = dataset.get(datum_key)
+
+                if isinstance(datum, FkDataset.WorkingConcept):
+                    relpath = datum.concept.directory_path.partition(dataset.directory_path)[2][1:]
+                    dst_path = os.path.join(dst_directory, relpath)
+                    if not os.path.isdir(dst_path):
+                        os.makedirs(dst_path, exist_ok=True)
+
+                    if not datum.modified:
+                        continue
+
+                    concept_tags = fkutils.normalize_tags(datum.tags)
+                    if len(concept_tags) > 0:
+                        tags_path = os.path.join(dst_path, "__prompt.txt")
+                        fkutils.write_tags(tags_path, concept_tags)
+
+                if isinstance(datum, FkDataset.WorkingImage):
+                    filename = datum.image.filename
+                    relpath = datum.concept.directory_path.partition(dataset.directory_path)[2][1:]
+                    dst_path = os.path.join(dst_directory, relpath, filename)
+
+                    if not os.path.isfile(dst_path):
+                        shutil.copyfile(datum.image.file_path, dst_path)
+
+                    if not datum.modified:
+                        continue
+
+                    filename = datum.image.text_filename
+                    relpath = datum.image.concept.directory_path.partition(dataset.directory_path)[2][1:]
+                    tags_path = os.path.join(dst_directory, relpath, filename)
+
+                    if datum.modified or not os.path.isfile(tags_path):
+                        fkutils.write_tags(tags_path, datum.tags)
+
+        fkdiag.show_progress_bar(self._root, do_save)
+        self.set_ui_state(tk.NORMAL)
 
     def __on_menu_item_exit(self):
         self.request_exit()
@@ -798,7 +878,30 @@ class FkFrame:
         self.open_datum(virtual_concept.canonical_name)
 
     def __on_button_dnd_zone(self):
-        fkdiag.drag_and_drop(self._root)
+        current_sel = self._current_tree_selection
+        if current_sel is None:
+            return
+
+        datum = self._dataset.get(current_sel)
+        datum_concept = datum.concept
+
+        files = fkdiag.drag_and_drop(self._root)
+        if files is None or len(files) <= 0:
+            return
+
+        for file in files:
+            concept_image = FkConceptImage(datum_concept, file)
+            datum_concept.add_image(concept_image)
+
+        self._dataset.refresh()
+        self.refresh_concept_tree()
+
+        str_size = str(self._preferences.image_preview_size)
+        del self._image_cache[str_size][datum_concept.canonical_name]
+        self.load_image(datum_concept.canonical_name)
+
+        self.set_selected_datum(datum.canonical_name)
+        self.open_datum(datum.canonical_name)
 
     def __on_combobox_preview_size(self, event):
         selected_value = event.widget.get()[1:]
@@ -877,7 +980,7 @@ class FkFrame:
 
         self.set_selected_datum(treeview_selection)
 
-    def __bind_status_text(self, widget: tk.Misc, status: str):
+    def __bind_status_text(self, widget: tk.Widget, status: str):
         widget_keys = widget.keys()
 
         def on_enter():
@@ -921,12 +1024,13 @@ def get_transparency_image(width: int = 768, height: int = 768) -> Image:
 
 
 def load_image_from_disk(src: str) -> Union[Image, None]:
-    if os.path.exists(src) and fkutils.is_image(src):
+    if os.path.isfile(src) and fkutils.is_image(src):
         return PIL.Image.open(src)
     else:
         return None
 
 
+# noinspection PyUnresolvedReferences
 def fit_image_to_canvas(
         image: Image,
         canvas_size: int,

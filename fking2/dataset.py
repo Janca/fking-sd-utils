@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os.path
 from functools import cmp_to_key
-from typing import Tuple, TypeAlias, TypeVar, Union
+from typing import Tuple, TypeAlias, TypeVar, Union, List
 
 import fking2.utils as fkutils
 from fking2.concepts import FkConcept, FkVirtualConcept, FkConceptImage
@@ -141,15 +141,11 @@ class FkDataset:
             return self._virtual
 
     class WorkingImage(IWorkingDatum):
-        def __init__(self, dataset: FkDataset, concept: FkDataset.WorkingConcept, image: Union[FkConceptImage | str]):
+        def __init__(self, dataset: FkDataset, concept: FkDataset.WorkingConcept, image: FkConceptImage):
             self._concept = concept.concept
             self._working_concept = concept
 
-            str_image = image
-            if isinstance(image, FkConceptImage):
-                str_image = image.file_path
-
-            basename = os.path.basename(str_image)
+            basename = os.path.basename(image.file_path)
 
             self._canonical_name = f"{concept.canonical_name}.{basename}"
             self._modified = False
@@ -258,7 +254,7 @@ class FkDataset:
         return keys
 
     @property
-    def values(self):
+    def values(self) -> List[FkDataset.IWorkingDatum]:
         return list(self._working_set.values())
 
     @property

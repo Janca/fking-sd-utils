@@ -7,12 +7,14 @@ import fking2.utils as fkutils
 
 
 class FkConcept:
+    directory_path: str
+
     def __init__(self, parent: Union[FkConcept, None], directory_path: str):
         self.parent = parent
         self.children: List[FkConcept] = []
         self.images: List[FkConceptImage] = []
 
-        self.directory_path = directory_path
+        self.directory_path = os.path.normcase(os.path.normpath(directory_path))
         self.tags_file_path = os.path.join(directory_path, "__prompt.txt")
         self.special_tags_file_path = os.path.join(directory_path, "__special.json")
 
@@ -38,17 +40,28 @@ class FkVirtualConcept(FkConcept):
 
     def __init__(self, parent: Union[FkConcept, None], name: str, tags: List[str]):
         self._tags = tags
-        super().__init__(parent, name.replace(' ', '_').lower())
+        directory_name = name.replace(' ', '_').lower()
+
+        directory_path: str
+        if parent is None:
+            directory_path = directory_name
+        else:
+            directory_path = os.path.join(parent.directory_path, directory_name)
+
+        super().__init__(parent, directory_path)
 
     def read_tags(self) -> List[str]:
         return self._tags[:]
 
 
 class FkConceptImage:
+    file_path: str
+    filename: str
+
     def __init__(self, concept: FkConcept, file_path: str):
         self.concept = concept
 
-        self.file_path = file_path
+        self.file_path = os.path.normcase(os.path.normpath(file_path))
         self.filename = os.path.basename(file_path)
 
         self.text_filename = f"{os.path.splitext(self.filename)[0]}.txt"

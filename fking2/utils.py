@@ -1,5 +1,6 @@
 import os
 import sys
+import tkinter
 import tkinter as tk
 from typing import Callable, List, Optional, Tuple, TypeVar
 
@@ -57,9 +58,6 @@ def find_and_replace(tags: List[str], replacements: List[List[str]]) -> List[str
 
 
 def is_image(path: str) -> bool:
-    if not os.path.isfile(path):
-        return False
-
     ext = os.path.splitext(path)[1]
     return ext in [".png", ".jpg", ".jpeg"]
 
@@ -107,6 +105,42 @@ def border_widget(
     widget.bind("<FocusOut>", lambda e: f.configure(background=color))
 
     return f, widget
+
+
+def setup_tab_focus(*args):
+    """
+    :type args: tkinter.Widget
+    :return:
+    """
+
+    def move_focus(target: tk.Widget):
+        def move_focus_fn(event):
+            target.focus()
+            return "break"
+
+        return move_focus_fn
+
+    length = len(args)
+    for i, a in enumerate(args, start=1):
+        a.bind("<Tab>", move_focus(args[0 if i >= length else i]))
+
+
+def setup_bind(bind: str, target: Callable, consume: bool, *args):
+    """
+    :param bind:
+    :param target:
+    :param consume:
+    :type args: tkinter.Widget
+    :return:
+    """
+
+    def do_target(event):
+        target()
+        if consume:
+            return "break"
+
+    for a in args:
+        a.bind(bind, do_target)
 
 
 def is_int(x: any) -> Tuple[bool, Optional[int]]:
