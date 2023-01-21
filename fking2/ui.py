@@ -128,14 +128,15 @@ class FkFrame:
         self._menu_file.entryconfig("Flatten Dataset", state=tk.DISABLED)
 
         self._menu_file.add_separator()
-        self._menu_file.add_command(label="Quit", underline=True, accelerator="Ctrl+Q")
+        self._menu_file.add_command(label="Quit", command=self.__on_menu_item_exit,
+                                    underline=True, accelerator="Ctrl+Q")
 
         # root.bind_all("<Control-s>", on_menu_item_save)
         # root.bind_all("<Control-l>", on_menu_item_flatten)
         # root.bind_all("<Control-o>", on_menu_item_open)
-        # root.bind_all("<Control-q>", on_request_exit)
+        self._root.bind_all("<Control-q>", self.request_exit)
         #
-        # root.protocol("WM_DELETE_WINDOW", on_request_exit)
+        self._root.protocol("WM_DELETE_WINDOW", self.request_exit)
 
         ico_img = fkutils.find_image_resource("icon.ico")
         self._root.iconbitmap(ico_img)
@@ -210,14 +211,14 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
-                focus_color="#a0a0a0"
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+            focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -259,10 +260,10 @@ class FkFrame:
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
-                frame_preview_size,
-                width=6,
-                values=self._values_combobox_preview_size,
-                justify=tk.CENTER
+            frame_preview_size,
+            width=6,
+            values=self._values_combobox_preview_size,
+            justify=tk.CENTER
         )
 
         preview_size_index = self._values_combobox_preview_size.index(self._previous_preview_size)
@@ -422,10 +423,10 @@ class FkFrame:
                 parent_concept = datum.concept
                 image_count = image_count + 1
             self._treeview_concepts.insert(
-                    '' if parent_concept is None else parent_concept.canonical_name,
-                    tk.END,
-                    datum.canonical_name,
-                    text=datum.name
+                '' if parent_concept is None else parent_concept.canonical_name,
+                tk.END,
+                datum.canonical_name,
+                text=datum.name
             )
 
         self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
@@ -467,8 +468,6 @@ class FkFrame:
 
         self._active_datum = datum
         tag, parent_tags = dataset.get_tags(datum.canonical_name)
-        print(f"Tags for '{datum.canonical_name}': {', '.join(tag)}")
-        print(f"Parent tags for '{datum.canonical_name}' {', '.join(parent_tags)}'")
 
         self.set_ui_state(tk.NORMAL)
         self.set_textfield_tags(tag, parent_tags)
@@ -487,8 +486,8 @@ class FkFrame:
 
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
-                self._app.preferences.image_preview_size,
-                self._app.preferences.image_preview_size
+            self._app.preferences.image_preview_size,
+            self._app.preferences.image_preview_size
         )
 
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
@@ -630,6 +629,18 @@ class FkFrame:
 
         return do_cache
 
+    def request_exit(self):
+        if self._dataset is None or not self._dataset.modified:
+            self._root.destroy()
+            return
+
+        if tkinter.messagebox.askyesno(
+                title="Confirm Exit",
+                message="Are you sure you want to exit?"
+                        "\nYou have unsaved changes."
+        ):
+            self._root.destroy()
+
     @property
     def _dataset(self):
         return self._app.working_dataset
@@ -708,8 +719,8 @@ class FkFrame:
                 shutil.rmtree(dataset_directory)
             else:
                 tkinter.messagebox.showinfo(
-                        title="Flattening Cancelled",
-                        message="Cancelled flattening operation, no changes were written to disk."
+                    title="Flattening Cancelled",
+                    message="Cancelled flattening operation, no changes were written to disk."
                 )
 
                 self.set_status("Ready")
@@ -754,11 +765,14 @@ class FkFrame:
 
         fkdiag.show_progress_bar(self._root, do_flatten)
         tkinter.messagebox.showinfo(
-                title="Flatten Dataset Complete",
-                message=f"Flattened {images_len,} image(s)."
+            title="Flatten Dataset Complete",
+            message=f"Flattened {images_len:,} image(s)."
         )
 
         self.set_status("Ready")
+
+    def __on_menu_item_exit(self):
+        self.request_exit()
 
     def __on_button_new_concept(self):
         datum_selection = self._current_tree_selection
@@ -772,6 +786,9 @@ class FkFrame:
         target_concept = selected_datum.concept
 
         name, tags = fkdiag.create_new_concept(self._root)
+        if name is None or len(name) <= 0:
+            return
+
         virtual_concept = FkVirtualConcept(target_concept, name, tags)
         target_concept.add_child(virtual_concept)
 

@@ -120,8 +120,10 @@ class _NewDatasetDialog(simpledialog.Dialog):
         textfield_name_len = len(textfield_name)
 
         if textfield_name_len <= 0:
-            tkinter.messagebox.showerror(title="Invalid Dataset Name",
-                                         message="Please input a valid dataset name.")
+            tkinter.messagebox.showerror(
+                title="Invalid Dataset Name",
+                message="Please input a valid dataset name."
+            )
         else:
             self.name = textfield_name.replace(" ", "_").lower()
             # self.working_directory = self._working_directory.strip()
@@ -227,10 +229,13 @@ class _NewConceptDialog(simpledialog.Dialog):
         frame.pack(side=tk.RIGHT, padx=6, pady=0)
 
     def __on_ok_button(self):
-        textfield_name = self._textfield_concept_name.get(1.0, tk.END)
+        textfield_name = self._textfield_concept_name.get(1.0, tk.END).strip()
+        if textfield_name is None or len(textfield_name) <= 0:
+            return
+
         textfield_tags = self._textfield_concept_tags.get(1.0, tk.END).split(',')
 
-        self.name = textfield_name.strip()
+        self.name = textfield_name
         self.tags = fkutils.normalize_tags(textfield_tags)
 
         self.destroy()
@@ -339,7 +344,7 @@ class _ProgressDialog(simpledialog.Dialog):
     _progress_status_text: tk.StringVar
     _progress_steps_text: tk.StringVar
 
-    thread:threading.Thread
+    thread: threading.Thread
 
     def __init__(self, parent: Union[tk.Misc, None], *args: Callable[[_ProgressDialog], None]) -> None:
         self._tasks = args
@@ -384,7 +389,7 @@ class _ProgressDialog(simpledialog.Dialog):
             self._progressbar["value"] = max(0, value)
             self._progressbar["maximum"] = max_value
 
-            self._progress_steps_text.set(f"{value}/{max_value}")
+            self._progress_steps_text.set(f"{value:,}/{max_value:,}")
         else:
             self._progressbar["value"] = 0
             self._progressbar["maximum"] = 100
