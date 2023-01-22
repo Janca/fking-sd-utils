@@ -260,6 +260,11 @@ class FkFrame:
         self._button_tag_editor_previous.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._button_tag_editor_next.pack(side=tk.RIGHT, fill=tk.X, expand=True)
 
+        self._button_tag_editor_paste.bind("<Button-1>", self.__on_button_paste)
+        self._button_tag_editor_apply.bind("<Button-1>", self.__on_button_apply)
+        self._button_tag_editor_previous.bind("<Button-1>", self.__on_button_previous)
+        self._button_tag_editor_next.bind("<Button-1>", self.__on_button_next)
+
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
             frame_preview_size,
@@ -862,10 +867,10 @@ class FkFrame:
         self.set_ui_state(tk.NORMAL)
         return True
 
-    def __on_menu_item_exit(self):
+    def __on_menu_item_exit(self, *args):
         self.request_exit()
 
-    def __on_button_new_concept(self):
+    def __on_button_new_concept(self, *args):
         datum_selection = self._current_tree_selection
         if datum_selection is None:
             return
@@ -892,7 +897,7 @@ class FkFrame:
 
         self.open_datum(virtual_concept.canonical_name)
 
-    def __on_button_dnd_zone(self):
+    def __on_button_dnd_zone(self, *args):
         current_sel = self._current_tree_selection
         if current_sel is None:
             return
@@ -918,11 +923,11 @@ class FkFrame:
         self.set_selected_datum(datum.canonical_name)
         self.open_datum(datum.canonical_name)
 
-    def __on_button_refresh(self):
+    def __on_button_refresh(self, *args):
         pass
 
-    def __on_combobox_preview_size(self, event):
-        selected_value = event.widget.get()[1:]
+    def __on_combobox_preview_size(self, *args):
+        selected_value = args[0].widget.get()[1:]
         selected_int_value = int(selected_value[:-2])
         current_size = self._app.preferences.image_preview_size
         current_sel = self._combobox_preview_size.current()
@@ -991,12 +996,24 @@ class FkFrame:
                 self._active_datum = active_datum
                 self.open_datum(self._active_datum.canonical_name)
 
-    def __on_treeview_concept_item_selected(self, event=None):
+    def __on_treeview_concept_item_selected(self, *args):
         treeview_selection = self._current_tree_selection
         if treeview_selection is None:
             return
 
         self.set_selected_datum(treeview_selection)
+
+    def __on_button_paste(self, *args):
+        pass
+
+    def __on_button_apply(self, *args):
+        pass
+
+    def __on_button_previous(self, *args):
+        pass
+
+    def __on_button_next(self, *args):
+        pass
 
     def __bind_status_text(self, widget: tk.Widget, status: str):
         widget_keys = widget.keys()
