@@ -659,7 +659,7 @@ class FkFrame:
         treeview_selection = self._treeview_concepts.selection()
         return None if len(treeview_selection) <= 0 else treeview_selection[0]
 
-    def __on_menu_item_new_dataset(self):
+    def __on_menu_item_new_dataset(self, *args):
         self.set_status("Creating dataset...")
         name, tags = fkdiag.create_new_dataset(self._root)
 
@@ -679,12 +679,21 @@ class FkFrame:
         self.set_status(f"Dataset '{root_concept.name}' created")
 
     def __on_menu_item_open_dataset(self, *args):
+        if self._dataset is not None and self._dataset.modified:
+            if tkinter.messagebox.askyesno(
+                    title="Save Current Dataset",
+                    message="You have unsaved changes."
+                            "\nWould you like to save before opening a new dataset?"
+                            "\n\nThis action is irreversible."
+            ) and not self.__on_menu_item_save_dataset(*args):
+                return False
+
         self.set_status("Opening dataset...")
         dataset_directory = tkinter.filedialog.askdirectory(parent=self._root, title="Open Dataset Directory")
 
         if not dataset_directory:
             self.set_status(self._last_status)
-            return
+            return False
 
         self.clear_dataset()
 
@@ -700,6 +709,7 @@ class FkFrame:
         do_cache = self.cache_image_set(cache_image_size)
         fkdiag.show_progress_bar(self._root, do_open, do_cache)
         self.open_datum(self._dataset.root.canonical_name)
+        return True
 
     def __on_menu_item_flatten_dataset(self, *args):
         dataset = self._dataset
@@ -785,10 +795,10 @@ class FkFrame:
 
     def __on_menu_item_save_dataset(self, *args):
         if self._dataset is None:
-            return
+            return False
 
         if not self._dataset.modified:
-            return
+            return False
 
         if self._dataset.virtual:
             dst_directory = tkinter.filedialog.askdirectory(title="Save Dataset")
@@ -850,6 +860,7 @@ class FkFrame:
 
         fkdiag.show_progress_bar(self._root, do_save)
         self.set_ui_state(tk.NORMAL)
+        return True
 
     def __on_menu_item_exit(self):
         self.request_exit()
@@ -865,8 +876,12 @@ class FkFrame:
 
         target_concept = selected_datum.concept
 
-        name, tags = fkdiag.create_new_concept(self._root)
+        name, tags = fkdiag.create_new_concept(self._root, self._dataset, target_concept)
         if name is None or len(name) <= 0:
+            return
+
+        existing = self._dataset.get(name)
+        if existing is not None:
             return
 
         virtual_concept = FkVirtualConcept(target_concept, name, tags)
@@ -902,6 +917,9 @@ class FkFrame:
 
         self.set_selected_datum(datum.canonical_name)
         self.open_datum(datum.canonical_name)
+
+    def __on_button_refresh(self):
+        pass
 
     def __on_combobox_preview_size(self, event):
         selected_value = event.widget.get()[1:]

@@ -13,6 +13,8 @@ import tkinterdnd2
 
 import fking2.app as fkapp
 import fking2.utils as fkutils
+from fking2.concepts import FkConcept
+from fking2.dataset import FkDataset
 
 
 class _NewDatasetDialog(simpledialog.Dialog):
@@ -162,6 +164,11 @@ class _NewConceptDialog(simpledialog.Dialog):
     _button_ok: tk.Button
     _button_cancel: tk.Button
 
+    def __init__(self, parent: tk.Misc, dataset: FkDataset, concept: FkConcept) -> None:
+        self._dataset = dataset
+        self._concept = concept
+        super().__init__(parent)
+
     def body(self, master):
         self.resizable(False, False)
 
@@ -233,6 +240,17 @@ class _NewConceptDialog(simpledialog.Dialog):
     def __on_ok_button(self):
         textfield_name = self._textfield_concept_name.get(1.0, tk.END).strip()
         if textfield_name is None or len(textfield_name) <= 0:
+            return
+
+        name = textfield_name.replace(' ', '_').lower()
+        canonical_name = f"{self._concept.canonical_name}.{name}"
+        existing_datum = self._dataset.contains(canonical_name)
+        if existing_datum:
+            tkinter.messagebox.showerror(
+                title="Concept Exists",
+                message=f"A concept with the name '{textfield_name}' exists."
+            )
+
             return
 
         textfield_tags = self._textfield_concept_tags.get(1.0, tk.END).split(',')
@@ -415,8 +433,8 @@ def create_new_dataset(root: tk.Tk):
     return ndd.name, ndd.root_tags
 
 
-def create_new_concept(root: tk.Tk):
-    ncd = _NewConceptDialog(root)
+def create_new_concept(root: tk.Tk, dataset: FkDataset, concept: FkConcept):
+    ncd = _NewConceptDialog(root, dataset, concept)
     return ncd.name, ncd.tags
 
 

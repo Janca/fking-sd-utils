@@ -182,20 +182,11 @@ class FkDataset:
         self._working_set = build_working_set(self, self.root)
         self._directory_path = root.directory_path
 
-    @property
-    def modified(self) -> bool:
-        for datum in self._working_set:
-            if self._working_set[datum].modified:
-                return True
+    def contains(self, canonical_name: str) -> bool:
+        return canonical_name in self._working_set
 
-        return False
-
-    @property
-    def directory_path(self):
-        return self._directory_path
-
-    def get(self, canonical_name) -> FkDataset.IWorkingDatum:
-        return self._working_set[canonical_name]
+    def get(self, canonical_name) -> Union[FkDataset.IWorkingDatum, None]:
+        return self._working_set[canonical_name] if self.contains(canonical_name) else None
 
     def get_tags(self, canonical_name) -> Tuple[CaptionList, CaptionList]:
         target = self.get(canonical_name)
@@ -240,6 +231,18 @@ class FkDataset:
 
     def refresh(self):
         self._working_set = build_working_set(self, self.root)
+
+    @property
+    def modified(self) -> bool:
+        for datum in self._working_set:
+            if self._working_set[datum].modified:
+                return True
+
+        return False
+
+    @property
+    def directory_path(self):
+        return self._directory_path
 
     @property
     def keys(self) -> list[str]:
