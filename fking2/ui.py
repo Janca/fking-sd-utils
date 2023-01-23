@@ -215,14 +215,14 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
-            frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
-            focus_color="#a0a0a0"
+                frame_tag_editor,
+                lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+                focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
-            frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+                frame_tag_editor,
+                lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -269,10 +269,10 @@ class FkFrame:
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
-            frame_preview_size,
-            width=6,
-            values=self._values_combobox_preview_size,
-            justify=tk.CENTER
+                frame_preview_size,
+                width=6,
+                values=self._values_combobox_preview_size,
+                justify=tk.CENTER
         )
 
         preview_size_index = self._values_combobox_preview_size.index(self._previous_preview_size)
@@ -418,6 +418,7 @@ class FkFrame:
             return
 
         datum_keys = dataset.keys
+        print('\n'.join(datum_keys))
 
         concept_count = 0
         image_count = 0
@@ -432,10 +433,10 @@ class FkFrame:
                 parent_concept = datum.concept
                 image_count = image_count + 1
             self._treeview_concepts.insert(
-                '' if parent_concept is None else parent_concept.canonical_name,
-                tk.END,
-                datum.canonical_name,
-                text=datum.name
+                    '' if parent_concept is None else parent_concept.canonical_name,
+                    tk.END,
+                    datum.canonical_name,
+                    text=datum.name
             )
 
         self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
@@ -459,8 +460,6 @@ class FkFrame:
 
     def open_datum(self, canonical_name: str):
         self._treeview_concepts.selection_clear()
-        self._treeview_concepts.selection_set(canonical_name)
-        self._treeview_concepts.focus(canonical_name)
 
         concept = self._dataset.get(canonical_name).concept
 
@@ -468,6 +467,10 @@ class FkFrame:
             iid = concept.canonical_name
             self._treeview_concepts.item(iid, open=True)
             concept = concept.parent
+
+        self._treeview_concepts.selection_set(canonical_name)
+        self._treeview_concepts.focus(canonical_name)
+        self._treeview_concepts.see(canonical_name)
 
     def set_selected_datum(self, canonical_name: str):
         dataset = self._dataset
@@ -498,8 +501,8 @@ class FkFrame:
 
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
-            self._app.preferences.image_preview_size,
-            self._app.preferences.image_preview_size
+                self._app.preferences.image_preview_size,
+                self._app.preferences.image_preview_size
         )
 
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
@@ -736,8 +739,8 @@ class FkFrame:
         self.set_status("Flattening dataset...")
 
         dst_directory = tkinter.filedialog.askdirectory(
-            parent=self._root,
-            title="Select Directory for Output"
+                parent=self._root,
+                title="Select Directory for Output"
         )
 
         if dst_directory is None or len(dst_directory) <= 0:
@@ -754,8 +757,8 @@ class FkFrame:
                 shutil.rmtree(dataset_directory)
             else:
                 tkinter.messagebox.showinfo(
-                    title="Flattening Cancelled",
-                    message="Cancelled flattening operation, no changes were written to disk."
+                        title="Flattening Cancelled",
+                        message="Cancelled flattening operation, no changes were written to disk."
                 )
 
                 self.set_status("Ready")
@@ -803,8 +806,8 @@ class FkFrame:
 
         fkdiag.show_progress_bar(self._root, do_flatten)
         tkinter.messagebox.showinfo(
-            title="Flatten Dataset Complete",
-            message=f"Flattened {images_len:,} image(s)."
+                title="Flatten Dataset Complete",
+                message=f"Flattened {images_len:,} image(s)."
         )
 
         self.set_status("Ready")
@@ -1039,7 +1042,34 @@ class FkFrame:
         self._dataset.apply_tags(datum.canonical_name, tags)
 
     def __on_button_previous(self, *args):
-        pass
+        if self._dataset is None:
+            return
+
+        current_sel = self._current_tree_selection
+        if current_sel is None or len(current_sel) <= 0:
+            return
+
+        def prev_entry_treeview(treeview: ttk.Treeview, current_iid: str) -> Union[str, None]:
+            prev_iid = treeview.prev(current_iid)
+            if prev_iid:
+                prev_children = treeview.get_children(prev_iid)
+                if prev_children:
+                    sub_children = treeview.get_children(prev_children[-1])
+                    if sub_children:
+                        return sub_children[-1]
+                    return prev_children[-1]
+                return prev_iid
+
+            parent_iid = treeview.parent(current_iid)
+            if parent_iid:
+                return parent_iid
+
+            return None
+
+        tree_prev_iid = prev_entry_treeview(self._treeview_concepts, current_sel)
+        if tree_prev_iid:
+            self.__on_button_apply(*args)
+            self.open_datum(tree_prev_iid)
 
     def __on_button_next(self, *args):
         if self._dataset is None:
@@ -1049,11 +1079,32 @@ class FkFrame:
         if current_sel is None or len(current_sel) <= 0:
             return
 
-        next_iid = self._dataset.next_image_iid(current_sel)
-        if next_iid is None:
-            return
+        def next_entry_treeview(treeview, current_iid):
+            child_iid = treeview.get_children(current_iid)
+            if child_iid:
+                return child_iid[0]
+            next_iid = treeview.next(current_iid)
+            if next_iid:
+                return next_iid
+            parent_iid = treeview.parent(current_iid)
+            if parent_iid:
+                next_sibling_iid = treeview.next(parent_iid)
+                if next_sibling_iid:
+                    return next_sibling_iid
+                else:
+                    parent_parent_iid = treeview.parent(parent_iid)
+                    if parent_parent_iid:
+                        next_sibling_iid = treeview.next(parent_parent_iid)
+                        if next_sibling_iid:
+                            return next_sibling_iid
+                        else:
+                            return next_entry_treeview(treeview, parent_parent_iid)
+            return None
 
-        print(f"Next iid: {next_iid}")
+        next_tree_iid = next_entry_treeview(self._treeview_concepts, current_sel)
+        if next:
+            self.__on_button_apply(*args)
+            self.open_datum(next_tree_iid)
 
     def __bind_status_text(self, widget: tk.Widget, status: str):
         widget_keys = widget.keys()

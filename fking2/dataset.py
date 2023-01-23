@@ -3,10 +3,10 @@ from __future__ import annotations
 import os.path
 import textwrap
 from functools import cmp_to_key
-from typing import Tuple, TypeAlias, TypeVar, Union, List
+from typing import List, Tuple, TypeAlias, TypeVar, Union
 
 import fking2.utils as fkutils
-from fking2.concepts import FkConcept, FkVirtualConcept, FkConceptImage
+from fking2.concepts import FkConcept, FkConceptImage, FkVirtualConcept
 
 CaptionList: TypeAlias = list[str]
 T = TypeVar("T")
@@ -61,6 +61,57 @@ class FkDataset:
         @property
         def tags(self) -> CaptionList:
             return self._tags[:]
+
+        @property
+        def filename(self) -> str:
+            return self.image.filename if isinstance(self, FkDataset.WorkingImage) else self.concept.directory_name
+
+        def compare_ref_2(self, other: FkDataset.IWorkingDatum) -> int:
+            if self == other:
+                return 0
+
+            c_name = self.canonical_name
+            oc_name = other.canonical_name
+
+            if c_name == oc_name:
+                return 0
+
+            is_image = isinstance(self, FkDataset.WorkingImage)
+            other_is_image = isinstance(other, FkDataset.WorkingImage)
+
+            if is_image and not other_is_image:
+                return 1
+            if not is_image and other_is_image:
+                return -1
+
+            self_concept = self.concept
+            other_concept = other.concept
+
+            if self_concept is None and other_concept is not None:
+                return -1
+            if self_concept is not None and other_concept is None:
+                return 1
+            if self_concept is None and other_concept is None:
+                return 0
+
+            concept_cname = self_concept.canonical_name
+            other_concept_cname = other_concept.canonical_name
+
+            if concept_cname == other_concept_cname:
+                self_filename = self.filename
+                other_filename = other.filename
+
+                if self_filename == other_filename:
+                    return 0
+                elif self_filename < other_filename:
+                    return -1
+                else:
+                    return 1
+
+            elif concept_cname < other_concept_cname:
+                return -1
+            else:
+                return 1
 
         def compare(self, other: FkDataset.IWorkingDatum) -> int:
             if self == other:
@@ -260,7 +311,6 @@ class FkDataset:
 
         keys = list(self._working_set.keys())
         keys.sort(key=cmp_to_key(compare))
-
         return keys
 
     @property

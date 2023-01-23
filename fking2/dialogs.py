@@ -374,6 +374,7 @@ class _ProgressDialog(simpledialog.Dialog):
     def body(self, master: tk.Frame):
         self.resizable(False, False)
         self.overrideredirect(True)
+        self.attributes('-topmost', True)
 
         master.configure(borderwidth=1, relief=tk.FLAT, background="#a0a0a0")
         frame = tk.Frame(master, borderwidth=16, relief=tk.FLAT)
