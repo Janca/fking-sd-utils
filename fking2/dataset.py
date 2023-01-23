@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os.path
+import textwrap
 from functools import cmp_to_key
 from typing import Tuple, TypeAlias, TypeVar, Union, List
 
@@ -199,6 +200,8 @@ class FkDataset:
 
         for concept in hierarchy:
             c_tags = fkutils.find_and_replace(concept.tags, [["__folder__", concept.name.lower()]])
+            c_tags.reverse()
+
             hierarchy_tags.extend(c_tags)
 
         hierarchy_tags.reverse()
@@ -206,6 +209,10 @@ class FkDataset:
             fkutils.normalize_tags(hierarchy_tags)
 
     def apply_tags(self, canonical_name, tags: CaptionList):
+        if not self.contains(canonical_name):
+            return
+
+        print("Applying", tags, "to", canonical_name)
         self._working_set[canonical_name].apply_tags(tags)
 
     def reset_tags(self, canonical_name):
@@ -267,6 +274,45 @@ class FkDataset:
     @property
     def virtual(self):
         return self.root.virtual
+
+    def get_iid_index(self, iid: str, keys: List[str] = None) -> int:
+        if iid not in self._working_set:
+            return -1
+
+        if keys is None:
+            keys = self.keys
+
+        return keys.index(iid)
+
+    def get_iid_by_index(self, index: int, keys: List[str] = None) -> Union[str, None]:
+        if keys is None:
+            keys = self.keys
+
+        if index < 0 or index >= len(keys):
+            return None
+
+        return keys[index]
+
+    def next_image_iid(self, iid: str) -> Union[str, None]:
+        keys = self.keys
+
+        print(textwrap.fill(', '.join(keys)))
+
+        current_idx = self.get_iid_index(iid, keys)
+        if current_idx == -1:
+            return None
+
+        next_idx = current_idx + 1
+        if next_idx >= len(self._working_set):
+            next_idx = 0
+
+        next_iid = self.get_iid_by_index(next_idx, keys)
+        next_datum = self.get(next_iid)
+
+        if isinstance(next_datum, FkDataset.WorkingConcept):
+            pass
+
+        return next_iid
 
 
 def build_working_set(dataset: FkDataset, src: FkDataset.WorkingConcept) -> [str, FkDataset.IWorkingDatum]:

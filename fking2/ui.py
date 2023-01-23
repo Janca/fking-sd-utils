@@ -76,6 +76,8 @@ class FkFrame:
 
     _datum_info: tk.StringVar
 
+    _last_tags: Union[List[str], None] = None
+
     def __init__(self, app: FkApp):
         super().__init__()
         self._app = app
@@ -664,6 +666,15 @@ class FkFrame:
         treeview_selection = self._treeview_concepts.selection()
         return None if len(treeview_selection) <= 0 else treeview_selection[0]
 
+    @property
+    def textfield_tags(self) -> List[str]:
+        text_tags = self._textfield_tags.get(1.0, tk.END)
+        if text_tags is None or len(text_tags) <= 0:
+            return []
+
+        split_tags = text_tags.split(',')
+        return fkutils.normalize_tags(split_tags)
+
     def __on_menu_item_new_dataset(self, *args):
         self.set_status("Creating dataset...")
         name, tags = fkdiag.create_new_dataset(self._root)
@@ -1004,16 +1015,45 @@ class FkFrame:
         self.set_selected_datum(treeview_selection)
 
     def __on_button_paste(self, *args):
-        pass
+        datum = self._active_datum
+        if datum is None:
+            return
+
+        last_tags = self._last_tags
+        if last_tags is None or len(last_tags) <= 0:
+            return
+
+        textfield_state = self._textfield_tags.cget("state")
+        if textfield_state != tk.NORMAL:
+            return
+
+        tags, parent_tags = self._dataset.get_tags(datum.canonical_name)
+        self.set_textfield_tags(last_tags, parent_tags)
 
     def __on_button_apply(self, *args):
-        pass
+        datum = self._active_datum
+        if datum is None:
+            return
+
+        tags = self.textfield_tags
+        self._dataset.apply_tags(datum.canonical_name, tags)
 
     def __on_button_previous(self, *args):
         pass
 
     def __on_button_next(self, *args):
-        pass
+        if self._dataset is None:
+            return
+
+        current_sel = self._current_tree_selection
+        if current_sel is None or len(current_sel) <= 0:
+            return
+
+        next_iid = self._dataset.next_image_iid(current_sel)
+        if next_iid is None:
+            return
+
+        print(f"Next iid: {next_iid}")
 
     def __bind_status_text(self, widget: tk.Widget, status: str):
         widget_keys = widget.keys()
