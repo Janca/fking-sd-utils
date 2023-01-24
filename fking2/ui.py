@@ -9,6 +9,7 @@ import tkinter.ttk as ttk
 from typing import Dict, List, Optional, Union
 
 import PIL
+import tkinterdnd2
 from PIL import ImageTk
 from PIL.Image import Image
 
@@ -22,7 +23,7 @@ from fking2.dataset import FkDataset
 
 
 class FkFrame:
-    _root: tk.Tk
+    _root: tkinterdnd2.TkinterDnD
     _frame: tk.Frame
     _menubar: tk.Menu
     _menu_file: tk.Menu
@@ -117,19 +118,22 @@ class FkFrame:
                                     underline=True, accelerator="Ctrl+N")
 
         self._menu_file.add_separator()
-
         self._menu_file.add_command(label="Open Dataset", command=self.__on_menu_item_open_dataset,
                                     underline=True, accelerator="Ctrl+O")
 
+        self._menu_file.add_separator()
         self._menu_file.add_command(label="Save Dataset", command=self.__on_menu_item_save_dataset,
                                     underline=True, accelerator="Ctrl+S")
+
+        self._menu_file.add_command(label="Save As...", command=self.__on_menu_item_save_dataset)
 
         self._menu_file.add_separator()
         self._menu_file.add_command(label="Flatten Dataset", command=self.__on_menu_item_flatten_dataset,
                                     underline=True, accelerator="Ctrl+L")
 
-        self._menu_file.entryconfig("Save Dataset", state=tk.DISABLED)
-        self._menu_file.entryconfig("Flatten Dataset", state=tk.DISABLED)
+        self._menu_file.add_separator()
+        self._menu_file.add_command(label="Close Dataset", command=self.__on_menu_item_close_dataset,
+                                    underline=True, accelerator="Ctrl+W")
 
         self._menu_file.add_separator()
         self._menu_file.add_command(label="Quit", command=self.__on_menu_item_exit,
@@ -144,6 +148,8 @@ class FkFrame:
 
         ico_img = fkutils.find_image_resource("icon.ico")
         self._root.iconbitmap(ico_img)
+
+        self.update_dataset_dependant_menu_state()
 
     def __init_grid(self):
         # PREVIEW IMAGE
@@ -175,6 +181,13 @@ class FkFrame:
         self._treeview_concepts.configure(yscrollcommand=treeview_scrollbar.set)
         self._treeview_concepts.bind("<<TreeviewSelect>>", self.__on_treeview_concept_item_selected)
 
+        # noinspection PyProtectedMember
+        tkinterdnd2.TkinterDnD._require(self._root)
+        # noinspection PyUnresolvedReferences
+        self._treeview_concepts.drop_target_register(tkinterdnd2.DND_FILES)
+        # noinspection PyUnresolvedReferences
+        self._treeview_concepts.dnd_bind("<<Drop>>", self.__on_concept_tree_file_drop)
+
         self._label_image_preview = ttk.Label(self._frame, padding=(0, 0), borderwidth=1, relief="solid")
         self._label_image_preview.grid(row=0, column=2, sticky="news", padx=(6, 0))
 
@@ -186,10 +199,10 @@ class FkFrame:
                                                           height=24, width=24, relief="flat",
                                                           command=self.__on_button_new_concept)
 
-        self._new_image_ico = fkutils.get_photo_image_resource("insert-image.png")
-        self._button_concept_tree_new_image = tk.Button(self._toolbar_concept_tools, image=self._new_image_ico,
-                                                        height=24, width=24, relief="flat",
-                                                        command=self.__on_button_dnd_zone)
+        # self._new_image_ico = fkutils.get_photo_image_resource("insert-image.png")
+        # self._button_concept_tree_new_image = tk.Button(self._toolbar_concept_tools, image=self._new_image_ico,
+        #                                                 height=24, width=24, relief="flat",
+        #                                                 command=self.__on_button_dnd_zone)
 
         self._edit_ico = fkutils.get_photo_image_resource("edit-rename.png")
         self._button_concept_tree_edit = tk.Button(self._toolbar_concept_tools, image=self._edit_ico,
@@ -201,7 +214,7 @@ class FkFrame:
                                                       height=24, width=24, relief="flat")
 
         self._button_concept_tree_new_concept.pack(side=tk.LEFT)
-        self._button_concept_tree_new_image.pack(side=tk.LEFT)
+        # self._button_concept_tree_new_image.pack(side=tk.LEFT)
         self._button_concept_tree_edit.pack(side=tk.LEFT)
         self._button_concept_tree_refresh.pack(side=tk.RIGHT)
 
@@ -215,14 +228,14 @@ class FkFrame:
         frame_tag_editor.grid_columnconfigure(1, minsize=148, weight=0)
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
-                focus_color="#a0a0a0"
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+            focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
-                frame_tag_editor,
-                lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+            frame_tag_editor,
+            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -269,10 +282,10 @@ class FkFrame:
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
-                frame_preview_size,
-                width=6,
-                values=self._values_combobox_preview_size,
-                justify=tk.CENTER
+            frame_preview_size,
+            width=6,
+            values=self._values_combobox_preview_size,
+            justify=tk.CENTER
         )
 
         preview_size_index = self._values_combobox_preview_size.index(self._previous_preview_size)
@@ -310,7 +323,7 @@ class FkFrame:
     def __init_status_bar(self):
         widgets = [
             [self._button_concept_tree_new_concept, "Create new child concept"],
-            [self._button_concept_tree_new_image, "Add images to selected concept"],
+            # [self._button_concept_tree_new_image, "Add images to selected concept"],
             [self._button_concept_tree_edit, "Edit selected concept"],
             [self._button_concept_tree_refresh, "Refresh concept tree"],
             [self._button_tag_editor_paste, "Paste tags from previously selected datum"],
@@ -384,7 +397,7 @@ class FkFrame:
 
     def set_ui_state(self, state: Union[tk.NORMAL, tk.DISABLED]):
         self._button_concept_tree_new_concept.configure(state=state)
-        self._button_concept_tree_new_image.configure(state=state)
+        # self._button_concept_tree_new_image.configure(state=state)
         self._button_concept_tree_edit.configure(state=state)
         self._button_concept_tree_refresh.configure(state=state)
 
@@ -397,7 +410,7 @@ class FkFrame:
 
     def set_concept_tools_ui_state(self, state: Union[tk.NORMAL, tk.DISABLED]):
         self._button_concept_tree_new_concept.configure(state=state)
-        self._button_concept_tree_new_image.configure(state=state)
+        # self._button_concept_tree_new_image.configure(state=state)
         self._button_concept_tree_edit.configure(state=state)
 
         self._button_tag_editor_paste.configure(state=state)
@@ -406,6 +419,18 @@ class FkFrame:
         self._button_tag_editor_previous.configure(state=state)
 
         self._textfield_tags.configure(state=state)
+
+    def update_dataset_dependant_menu_state(self):
+        state = tk.NORMAL if self._dataset is not None else tk.DISABLED
+        self._menu_file.entryconfig("Save Dataset", state=state)
+
+        if state != tk.DISABLED and self._dataset.root.virtual:
+            self._menu_file.entryconfig("Save As...", state=tk.DISABLED)
+        else:
+            self._menu_file.entryconfig("Save As...", state=state)
+
+        self._menu_file.entryconfig("Flatten Dataset", state=state)
+        self._menu_file.entryconfig("Close Dataset", state=state)
 
     def refresh_concept_tree(self):
         self.set_status("Refreshing concept tree...")
@@ -433,23 +458,25 @@ class FkFrame:
                 parent_concept = datum.concept
                 image_count = image_count + 1
             self._treeview_concepts.insert(
-                    '' if parent_concept is None else parent_concept.canonical_name,
-                    tk.END,
-                    datum.canonical_name,
-                    text=datum.name
+                '' if parent_concept is None else parent_concept.canonical_name,
+                tk.END,
+                datum.canonical_name,
+                text=datum.name
             )
 
-        self._menu_file.entryconfig("Flatten Dataset", state=tk.NORMAL)
-        self._menu_file.entryconfig("Save Dataset", state=tk.NORMAL)
+        self.update_dataset_dependant_menu_state()
         self.set_status(f"Loaded '{concept_count}' concept(s) and '{image_count}' image(s)")
 
     def refresh_image_preview(self):
+        self.set_status("Loading preview...")
         if self._active_datum is None:
             self.clear_image_preview()
+            self.set_status("Ready")
         else:
-            self.set_status("Loading preview...")
             image = self.load_image(self._active_datum.canonical_name)
             if image is None:
+                self.clear_image_preview()
+                self.set_status("Ready")
                 return
 
             fix_to_top = True if isinstance(self._active_datum, FkDataset.WorkingConcept) else False
@@ -501,8 +528,8 @@ class FkFrame:
 
     def clear_image_preview(self):
         transparent_image = get_transparency_image(
-                self._app.preferences.image_preview_size,
-                self._app.preferences.image_preview_size
+            self._app.preferences.image_preview_size,
+            self._app.preferences.image_preview_size
         )
 
         self._image_transparent_image = ImageTk.PhotoImage(transparent_image)
@@ -651,8 +678,8 @@ class FkFrame:
 
         if tkinter.messagebox.askyesno(
                 title="Confirm Exit",
-                message="Are you sure you want to exit?"
-                        "\nYou have unsaved changes."
+                message="Your dataset has changes not written to disk."
+                        "\nAre you sure you want to exit?"
         ):
             self._root.destroy()
 
@@ -739,8 +766,8 @@ class FkFrame:
         self.set_status("Flattening dataset...")
 
         dst_directory = tkinter.filedialog.askdirectory(
-                parent=self._root,
-                title="Select Directory for Output"
+            parent=self._root,
+            title="Select Directory for Output"
         )
 
         if dst_directory is None or len(dst_directory) <= 0:
@@ -757,8 +784,8 @@ class FkFrame:
                 shutil.rmtree(dataset_directory)
             else:
                 tkinter.messagebox.showinfo(
-                        title="Flattening Cancelled",
-                        message="Cancelled flattening operation, no changes were written to disk."
+                    title="Flattening Cancelled",
+                    message="Cancelled flattening operation, no changes were written to disk."
                 )
 
                 self.set_status("Ready")
@@ -806,8 +833,8 @@ class FkFrame:
 
         fkdiag.show_progress_bar(self._root, do_flatten)
         tkinter.messagebox.showinfo(
-                title="Flatten Dataset Complete",
-                message=f"Flattened {images_len:,} image(s)."
+            title="Flatten Dataset Complete",
+            message=f"Flattened {images_len:,} image(s)."
         )
 
         self.set_status("Ready")
@@ -880,6 +907,19 @@ class FkFrame:
         fkdiag.show_progress_bar(self._root, do_save)
         self.set_ui_state(tk.NORMAL)
         return True
+
+    def __on_menu_item_close_dataset(self, *args):
+        dataset = self._dataset
+        if dataset is None:
+            return
+
+        if not dataset.modified or tkinter.messagebox.askyesno(
+                title="Confirm Close",
+                message="You dataset contains changes not written to disk."
+                        "\nAre you sure you want to close?"
+        ):
+            self.clear_dataset()
+            self.update_dataset_dependant_menu_state()
 
     def __on_menu_item_exit(self, *args):
         self.request_exit()
@@ -1102,9 +1142,95 @@ class FkFrame:
             return None
 
         next_tree_iid = next_entry_treeview(self._treeview_concepts, current_sel)
-        if next:
+        if next_tree_iid:
             self.__on_button_apply(*args)
             self.open_datum(next_tree_iid)
+
+    def __on_concept_tree_file_drop(self, *args):
+        dataset = self._dataset
+        if dataset is None:
+            return
+
+        datum = self._active_datum
+        if datum is None:
+            return
+
+        def find_images(path: str) -> list[str]:
+            if os.path.isfile(path) and fkutils.is_image(path):
+                return [path]
+
+            if os.path.isdir(path):
+                images: list[str] = []
+
+                for filename in os.listdir(path):
+                    images.extend(find_images(os.path.join(path, filename)))
+
+                return images
+
+            return []
+
+        target_concept = datum.concept
+        dnd_files = self._root.splitlist(args[0].data)
+
+        def do_dnd(pbd):
+            """
+            :type pbd: fking2.dialogs._ProgressDialog
+            :return:
+            """
+            self.set_status(f"Adding images to '{target_concept.canonical_name}'...")
+            pbd.update_progressbar("Scanning for images...")
+
+            temp_root = FkVirtualConcept(target_concept.parent, target_concept.directory_name,
+                                         target_concept.read_tags())
+
+            for file in dnd_files:
+                if os.path.isfile(file) and fkutils.is_image(file):
+                    img = FkConceptImage(temp_root, file)
+                    temp_root.add_image(img)
+                elif os.path.isdir(file):
+                    child_concept = fkconcepts.build_concept_tree(file, temp_root)
+                    temp_root.add_child(child_concept)
+
+            if len(temp_root.children) > 0:
+                temp_root.copy_to(target_concept, lambda e: not self._dataset.contains(e.canonical_name))
+            else:
+                for image in temp_root.images:
+                    if not self._dataset.contains(image.canonical_name):
+                        fkconcepts.copy(image, target_concept)
+
+            pbd.update_progressbar("Refreshing dataset...")
+            self._dataset.refresh()
+
+            pbd.update_progressbar("Rebuilding dataset tree...")
+            self.refresh_concept_tree()
+
+            self.set_status("Caching images...")
+            concepts, images = hierarchy(target_concept, True)
+            current_previewer_size = str(self._preferences.image_preview_size)
+            concepts = [c for c in concepts if c.canonical_name not in self._image_cache[current_previewer_size]]
+            images = [i for i in images if i.canonical_name not in self._image_cache[current_previewer_size]]
+
+            total = len(images) + len(concepts) + 1
+            for i, image in enumerate(images, start=1):
+                pbd.update_progressbar(f"Caching image...", i, total)
+                self.set_status(f"Caching image '{image.canonical_name}'...")
+                self.load_image(image.canonical_name)
+
+            for i, concept in enumerate(concepts, start=len(images)):
+                pbd.update_progressbar(f"Caching image...", i, total)
+                self.set_status(f"Caching image '{concept.canonical_name}'...")
+                self.load_image(concept.canonical_name)
+
+            self.set_status("Caching image...")
+            pbd.update_progressbar("Caching image...", total, total)
+            str_size = str(self._preferences.image_preview_size)
+            del self._image_cache[str_size][target_concept.canonical_name]
+            self.load_image(target_concept.canonical_name)
+            self.set_status("Ready")
+
+        fkdiag.show_progress_bar(self._root, do_dnd)
+        self.set_selected_datum(target_concept.canonical_name)
+        self.open_datum(datum.canonical_name)
 
     def __bind_status_text(self, widget: tk.Widget, status: str):
         widget_keys = widget.keys()
@@ -1209,7 +1335,7 @@ def image_grid(images: List[Image], canvas_size: int) -> Image:
 
 def hierarchy(concept: FkConcept, include_self: bool = False):
     _concepts: List[FkConcept] = [concept] if include_self else []
-    _concept_images: List[FkConceptImage] = [concept.images] if include_self else []
+    _concept_images: List[FkConceptImage] = concept.images[:] if include_self else []
 
     for child in concept.children:
         _concepts.append(child)

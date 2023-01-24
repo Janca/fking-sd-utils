@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 
 import fking2.utils as fkutils
+from fking2.utils import IFkCanonical
 
 
-class FkConcept:
+class FkConcept(IFkCanonical):
     directory_path: str
 
     def __init__(self, parent: Union[FkConcept, None], directory_path: str):
@@ -21,7 +22,7 @@ class FkConcept:
         self.directory_name = os.path.basename(directory_path)
         self.name = self.directory_name.replace('_', ' ').title()
 
-        self.canonical_name = get_canonical_name(self)
+        self._canonical_name = get_canonical_name(self)
 
     def add_child(self, child: FkConcept):
         self.children.append(child)
@@ -37,9 +38,12 @@ class FkConcept:
 
 
 class FkVirtualConcept(FkConcept):
+    _name: str
 
     def __init__(self, parent: Union[FkConcept, None], name: str, tags: List[str]):
         self._tags = tags
+        self._name = name
+
         directory_name = name.replace(' ', '_').lower()
 
         directory_path: str
@@ -53,21 +57,30 @@ class FkVirtualConcept(FkConcept):
     def read_tags(self) -> List[str]:
         return self._tags[:]
 
+    def copy_to(
+            self,
+            dst: FkConcept,
+            filter_fn: Callable[[Union[FkConcept, FkConceptImage]], bool] = None
+    ):
+        copy(self, dst, filter_fn)
 
-class FkConceptImage:
+
+class FkConceptImage(IFkCanonical):
     file_path: str
     filename: str
 
     def __init__(self, concept: FkConcept, file_path: str):
         self.concept = concept
 
-        self.file_path = os.path.normcase(os.path.normpath(file_path))
+        self.file_path = os.path.abspath(file_path)
         self.filename = os.path.basename(file_path)
 
         self.text_filename = f"{os.path.splitext(self.filename)[0]}.txt"
-        self.text_file_path = os.path.join(self.concept.directory_path, self.text_filename)
 
-        self.canonical_name = get_canonical_name(self)
+        directory = os.path.dirname(self.file_path)
+        self.text_file_path = os.path.join(directory, self.text_filename)
+
+        self._canonical_name = get_canonical_name(self)
 
     def read_tags(self) -> list[str]:
         return fkutils.read_tags(self.text_file_path)
@@ -121,3 +134,30 @@ def get_concept_hierarchy(
         return hierarchy[:depth or None]
     else:
         return hierarchy[depth:]
+
+
+# noinspection PyProtectedMember
+def copy(
+        src: Union[FkConcept, FkConceptImage],
+        destination: FkConcept,
+        filter_fn: Callable[[Union[FkConcept, FkConceptImage]], bool] = None
+):
+    if isinstance(src, FkConceptImage):
+        dst_image = FkConceptImage(destination, src.file_path)
+        if filter_fn is None or filter_fn(dst_image):
+            destination.add_image(dst_image)
+        return
+
+    if isinstance(src, FkVirtualConcept):
+        dst_concept = FkVirtualConcept(destination, src._name, src._tags)
+    else:
+        dst_concept = FkConcept(destination, src.directory_path)
+
+    if filter_fn is None or filter_fn(dst_concept):
+        destination.add_child(dst_concept)
+
+    for image in src.images:
+        copy(image, dst_concept)
+
+    for concept in src.children:
+        copy(concept, dst_concept)

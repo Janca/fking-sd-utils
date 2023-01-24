@@ -9,6 +9,14 @@ from PIL import Image
 T = TypeVar("T")
 
 
+class IFkCanonical:
+    _canonical_name: str
+
+    @property
+    def canonical_name(self) -> str:
+        return self._canonical_name
+
+
 def normalize_tags(tags: list[str]) -> list[str]:
     unique_tags: list[str] = []
     for tag in tags:
