@@ -34,6 +34,7 @@ class FkFrame:
     _button_concept_tree_new_image: tk.Button
     _button_concept_tree_refresh: tk.Button
     _button_concept_tree_edit: tk.Button
+    _button_concept_tree_trash: tk.Button
 
     _button_tag_editor_paste: tk.Button
     _button_tag_editor_apply: tk.Button
@@ -196,27 +197,33 @@ class FkFrame:
 
         self._new_concept_ico = fkutils.get_photo_image_resource("folder-new.png")
         self._button_concept_tree_new_concept = tk.Button(self._toolbar_concept_tools, image=self._new_concept_ico,
-                                                          height=24, width=24, relief="flat",
+                                                          height=24, width=24, relief=tk.FLAT,
                                                           command=self.__on_button_new_concept)
 
         # self._new_image_ico = fkutils.get_photo_image_resource("insert-image.png")
         # self._button_concept_tree_new_image = tk.Button(self._toolbar_concept_tools, image=self._new_image_ico,
-        #                                                 height=24, width=24, relief="flat",
+        #                                                 height=24, width=24, relief=tk.FLAT,
         #                                                 command=self.__on_button_dnd_zone)
 
         self._edit_ico = fkutils.get_photo_image_resource("edit-rename.png")
         self._button_concept_tree_edit = tk.Button(self._toolbar_concept_tools, image=self._edit_ico,
-                                                   height=24, width=24, relief="flat")
+                                                   height=24, width=24, relief=tk.FLAT)
+
+        self._trash_ico = fkutils.get_photo_image_resource("trash.png")
+        self._button_concept_tree_trash = tk.Button(self._toolbar_concept_tools, image=self._trash_ico,
+                                                    height=24, width=24, relief=tk.FLAT,
+                                                    command=self.__on_button_trash)
 
         self._refresh_ico = fkutils.get_photo_image_resource("refresh.png")
-
         self._button_concept_tree_refresh = tk.Button(self._toolbar_concept_tools, image=self._refresh_ico,
-                                                      height=24, width=24, relief="flat")
+                                                      height=24, width=24, relief=tk.FLAT,
+                                                      command=self.__on_button_refresh)
 
         self._button_concept_tree_new_concept.pack(side=tk.LEFT)
         # self._button_concept_tree_new_image.pack(side=tk.LEFT)
         self._button_concept_tree_edit.pack(side=tk.LEFT)
         self._button_concept_tree_refresh.pack(side=tk.RIGHT)
+        self._button_concept_tree_trash.pack(side=tk.RIGHT)
 
         frame_tag_editor = tk.Frame(self._frame)
         frame_tag_editor.grid(row=2, column=0, columnspan=3, sticky=tk.NSEW, pady=(6, 0))
@@ -229,13 +236,13 @@ class FkFrame:
 
         frame_parent_tags, self._textfield_parent_tags = fkutils.border_widget(
             frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief="flat"),
+            lambda tkf: tk.Text(tkf, height=4, wrap=tk.WORD, relief=tk.FLAT),
             focus_color="#a0a0a0"
         )
 
         frame_tags, self._textfield_tags = fkutils.border_widget(
             frame_tag_editor,
-            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief="flat")
+            lambda tkf: tk.Text(tkf, height=6, wrap=tk.WORD, relief=tk.FLAT)
         )
 
         self._textfield_parent_tags.configure(state=tk.DISABLED)
@@ -259,26 +266,30 @@ class FkFrame:
         self._next_ico = fkutils.get_photo_image_resource("right.png")
 
         self._button_tag_editor_paste = tk.Button(frame_tag_editor_actions, compound=tk.LEFT,
-                                                  image=self._paste_ico, text="Paste", padx=3)
+                                                  image=self._paste_ico, text="Paste", padx=3,
+                                                  command=self.__on_button_paste)
 
         self._button_tag_editor_apply = tk.Button(frame_tag_editor_actions, text="Apply",
-                                                  image=self._apply_ico, padx=3, compound=tk.LEFT)
+                                                  image=self._apply_ico, padx=3, compound=tk.LEFT,
+                                                  command=self.__on_button_apply)
 
         self._button_tag_editor_previous = tk.Button(frame_tag_editor_actions, compound=tk.LEFT, height=20,
-                                                     image=self._previous_ico, text="Prev", padx=3)
+                                                     image=self._previous_ico, text="Prev", padx=3,
+                                                     command=self.__on_button_previous)
 
         self._button_tag_editor_next = tk.Button(frame_tag_editor_actions, compound=tk.RIGHT, height=20,
-                                                 image=self._next_ico, text="Next", padx=3)
+                                                 image=self._next_ico, text="Next", padx=3,
+                                                 command=self.__on_button_next)
 
         self._button_tag_editor_paste.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self._button_tag_editor_apply.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self._button_tag_editor_previous.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._button_tag_editor_next.pack(side=tk.RIGHT, fill=tk.X, expand=True)
 
-        self._button_tag_editor_paste.bind("<Button-1>", self.__on_button_paste)
-        self._button_tag_editor_apply.bind("<Button-1>", self.__on_button_apply)
-        self._button_tag_editor_previous.bind("<Button-1>", self.__on_button_previous)
-        self._button_tag_editor_next.bind("<Button-1>", self.__on_button_next)
+        # self._button_tag_editor_paste.bind("<Button-1>", self.__on_button_paste)
+        # self._button_tag_editor_apply.bind("<Button-1>", self.__on_button_apply)
+        # self._button_tag_editor_previous.bind("<Button-1>", self.__on_button_previous)
+        # self._button_tag_editor_next.bind("<Button-1>", self.__on_button_next)
 
         frame_preview_size = tk.Frame(self._frame)
         self._combobox_preview_size = ttk.Combobox(
@@ -443,7 +454,6 @@ class FkFrame:
             return
 
         datum_keys = dataset.keys
-        print('\n'.join(datum_keys))
 
         concept_count = 0
         image_count = 0
@@ -976,6 +986,30 @@ class FkFrame:
 
         self.set_selected_datum(datum.canonical_name)
         self.open_datum(datum.canonical_name)
+
+    def __on_button_trash(self, *args):
+        dataset = self._dataset
+        if dataset is None:
+            return
+
+        datum = self._active_datum
+        if datum is None:
+            return
+
+        if isinstance(datum, FkConcept):
+            concepts, images = hierarchy(datum, True)
+            if not tkinter.messagebox.askyesno(
+                    title="Confirm Delete",
+                    message=f"Delete {len(concepts)} and {len(images)} images?"
+                            f"\nChanges are not written to disk until save."
+            ):
+                return
+
+        parent = datum.concept.parent
+        dataset.remove(datum.canonical_name)
+        self.refresh_concept_tree()
+
+        self.open_datum(parent.canonical_name)
 
     def __on_button_refresh(self, *args):
         pass

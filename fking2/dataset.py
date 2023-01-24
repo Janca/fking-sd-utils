@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os.path
-import textwrap
 from functools import cmp_to_key
 from typing import List, Tuple, TypeAlias, TypeVar, Union
 
@@ -325,44 +324,29 @@ class FkDataset:
     def virtual(self):
         return self.root.virtual
 
-    def get_iid_index(self, iid: str, keys: List[str] = None) -> int:
-        if iid not in self._working_set:
-            return -1
+    def remove(self, canonical_name):
+        if canonical_name in self._working_set:
+            datum = self.get(canonical_name)
 
-        if keys is None:
-            keys = self.keys
+            if isinstance(datum, FkDataset.WorkingConcept):
+                concept = datum.concept
+                for child in concept.children:
+                    concept.children.remove(child)
+                    child_cname = child.canonical_name
+                    self.remove(child_cname)
 
-        return keys.index(iid)
+                parent = concept.parent
+                if parent is not None and concept in parent.children:
+                    parent.children.remove(concept)
 
-    def get_iid_by_index(self, index: int, keys: List[str] = None) -> Union[str, None]:
-        if keys is None:
-            keys = self.keys
+                for image in concept.images:
+                    self.remove(image.canonical_name)
 
-        if index < 0 or index >= len(keys):
-            return None
+            if isinstance(datum, FkDataset.WorkingImage):
+                datum.concept.images.remove(datum.image)
 
-        return keys[index]
-
-    def next_image_iid(self, iid: str) -> Union[str, None]:
-        keys = self.keys
-
-        print(textwrap.fill(', '.join(keys)))
-
-        current_idx = self.get_iid_index(iid, keys)
-        if current_idx == -1:
-            return None
-
-        next_idx = current_idx + 1
-        if next_idx >= len(self._working_set):
-            next_idx = 0
-
-        next_iid = self.get_iid_by_index(next_idx, keys)
-        next_datum = self.get(next_iid)
-
-        if isinstance(next_datum, FkDataset.WorkingConcept):
-            pass
-
-        return next_iid
+            print("Deleting", canonical_name)
+            del self._working_set[canonical_name]
 
 
 def build_working_set(dataset: FkDataset, src: FkDataset.WorkingConcept) -> [str, FkDataset.IWorkingDatum]:
